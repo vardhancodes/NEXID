@@ -3,7 +3,7 @@ import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 export type StockCardProps = {
   symbol: string;
-  name?: string;      // Make props optional
+  name?: string;
   price?: number;
   change?: number;
   changePercent?: number;
@@ -23,14 +23,7 @@ const StockCard = ({ symbol, name, price, change, changePercent, onClick }: Card
     : 'hover:shadow-[0_0_20px_rgba(239,68,68,0.4)]';
 
   return (
-    <div
-      onClick={onClick}
-      className={`
-        bg-hover-bg p-6 rounded-lg border border-border-color
-        cursor-pointer transition-all duration-300
-        hover:scale-105 hover:border-primary ${glowClass}
-      `}
-    >
+    <div onClick={onClick} className={`bg-hover-bg p-6 rounded-lg border border-border-color cursor-pointer transition-all duration-300 hover:scale-105 hover:border-primary ${glowClass}`}>
       <div className="flex justify-between items-start">
         <div>
           <div className="text-2xl font-bold text-white">{symbol}</div>
