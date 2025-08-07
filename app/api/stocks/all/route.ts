@@ -1,8 +1,16 @@
 import { NextResponse } from 'next/server';
-import { getStockIndex } from '@/lib/stock-service'; 
 
 const FMP_API_URL = 'https://financialmodelingprep.com/api/v3';
 const API_KEY = process.env.FMP_API_KEY;
+
+// This helper function formats the data consistently
+const formatStockData = (stock: any) => ({
+  symbol: stock.symbol,
+  name: stock.name,
+  price: stock.price,
+  change: stock.change,
+  changePercent: stock.changesPercentage,
+});
 
 export async function GET(request: Request) {
   if (!API_KEY) {
@@ -13,66 +21,37 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('search')?.toLowerCase();
     
+    let stocks: any[] = [];
+
     if (query) {
-      // --- Smarter Search Logic ---
-      const stockIndex = await getStockIndex();
-
-      const filteredResults = stockIndex.filter(stock => 
-        stock.name.toLowerCase().includes(query) || 
-        stock.symbol.toLowerCase().startsWith(query)
-      );
-
-      // **New Sorting Logic**: Prioritize major exchanges (NASDAQ, NYSE)
-      const exchangePriority: { [key: string]: number } = { 'NASDAQ': 1, 'NYSE': 2 };
+      // --- Direct Live Search Logic ---
+      // We directly search FMP by company name and get live quotes.
+      const searchRes = await fetch(`${FMP_API_URL}/search-name?query=${query}&limit=50&exchange=NASDAQ,NYSE,AMEX&apikey=${API_KEY}`);
       
-      const sortedResults = filteredResults.sort((a: any, b: any) => {
-        const priorityA = exchangePriority[a.exchangeShortName] || 99;
-        const priorityB = exchangePriority[b.exchangeShortName] || 99;
-        return priorityA - priorityB;
-      });
+      if (!searchRes.ok) throw new Error('Search API failed');
+      const searchData = await searchRes.json();
 
-      const topResults = sortedResults.slice(0, 50);
-
-      if (topResults.length === 0) {
-        return NextResponse.json([]);
+      if (searchData && searchData.length > 0) {
+        const symbols = searchData.map((s: any) => s.symbol).join(',');
+        const quoteRes = await fetch(`${FMP_API_URL}/quote/${symbols}?apikey=${API_KEY}`);
+        if (!quoteRes.ok) throw new Error('Quote API failed');
+        stocks = await quoteRes.json();
       }
-
-      const symbols = topResults.map(stock => stock.symbol).join(',');
-      const quoteRes = await fetch(`${FMP_API_URL}/quote/${symbols}?apikey=${API_KEY}`);
-      const quoteData = await quoteRes.json();
-      
-      const formattedStocks = (Array.isArray(quoteData) ? quoteData : [quoteData])
-        .filter(stock => stock && typeof stock.price === 'number')
-        .map(stock => ({
-          symbol: stock.symbol,
-          name: stock.name,
-          price: stock.price,
-          change: stock.change,
-          changePercent: stock.changesPercentage,
-        }));
-
-      return NextResponse.json(formattedStocks);
-
     } else {
-      // --- Default View Logic (No changes here) ---
+      // --- Default View Logic ---
+      // Fetches a default list when the search bar is empty.
       const listType = searchParams.get('listType') || 'actives';
       const listRes = await fetch(`${FMP_API_URL}/stock_market/${listType}?limit=50&apikey=${API_KEY}`);
-      const listData = await listRes.json();
-
-      const formattedStocks = (Array.isArray(listData) ? listData : [])
-        .filter(stock => stock && typeof stock.price === 'number')
-        .map(stock => ({
-          symbol: stock.symbol,
-          name: stock.name,
-          price: stock.price,
-          change: stock.change,
-          changePercent: stock.changesPercentage,
-        }));
-      
-      return NextResponse.json(formattedStocks);
+      if (!listRes.ok) throw new Error('List API failed');
+      stocks = await listRes.json();
     }
+    
+    // Final safety filter remains to prevent any crashes
+    const formattedStocks = (Array.isArray(stocks) ? stocks : [])
+      .filter(stock => stock && typeof stock.price === 'number' && stock.symbol)
+      .map(formatStockData);
+
+    return NextResponse.json(formattedStocks);
+
   } catch (error: any) {
-    console.error("API Error:", error.message);
-    return new NextResponse('Internal Server Error', { status: 500 });
-  }
-}
+    console.error("
