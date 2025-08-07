@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getStockIndex } from '@/lib/stock-service'; // Import our new function
 
 const FMP_API_URL = 'https://financialmodelingprep.com/api/v3';
 const API_KEY = process.env.FMP_API_KEY;
@@ -11,42 +12,60 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('search')?.toLowerCase();
-    const listType = searchParams.get('listType') || 'actives';
-
-    let stocks: any[] = [];
-
-    if (query) {
-      // This part handles the powerful COMPANY NAME search when you type.
-      const searchRes = await fetch(`${FMP_API_URL}/search-name?query=${query}&limit=20&apikey=${API_KEY}`);
-      const searchData = await searchRes.json();
-
-      if (searchData && searchData.length > 0) {
-        const symbols = searchData.map((stock: any) => stock.symbol).join(',');
-        const quoteRes = await fetch(`${FMP_API_URL}/quote/${symbols}?apikey=${API_KEY}`);
-        stocks = await quoteRes.json();
-      }
-    } else {
-      // This part handles the DEFAULT list when the search bar is empty.
-      // You can change "limit=50" to a higher number like "limit=200" if you want.
-      const listRes = await fetch(`${FMP_API_URL}/stock_market/${listType}?limit=50&apikey=${API_KEY}`);
-      stocks = await listRes.json();
-    }
     
-    // This safety filter ensures no bad data crashes your app.
-    const formattedStocks = stocks
-      .filter(stock => stock && typeof stock.price === 'number' && stock.symbol)
-      .map(stock => ({
-        symbol: stock.symbol,
-        name: stock.name,
-        price: stock.price,
-        change: stock.change,
-        changePercent: stock.changesPercentage,
-      }));
+    if (query) {
+      // --- Powerful Search Logic ---
+      const stockIndex = await getStockIndex();
 
-    return NextResponse.json(formattedStocks);
+      // Filter the master list in memory based on company name OR symbol
+      const searchResults = stockIndex
+        .filter(stock => 
+          stock.name.toLowerCase().includes(query) || 
+          stock.symbol.toLowerCase().startsWith(query)
+        )
+        .slice(0, 50); // Get the top 50 matches
 
+      if (searchResults.length === 0) {
+        return NextResponse.json([]);
+      }
+
+      // Fetch live quotes for only the top 50 matches
+      const symbols = searchResults.map(stock => stock.symbol).join(',');
+      const quoteRes = await fetch(`${FMP_API_URL}/quote/${symbols}?apikey=${API_KEY}`);
+      const quoteData = await quoteRes.json();
+      
+      const formattedStocks = (Array.isArray(quoteData) ? quoteData : [quoteData])
+        .filter(stock => stock && typeof stock.price === 'number')
+        .map(stock => ({
+          symbol: stock.symbol,
+          name: stock.name,
+          price: stock.price,
+          change: stock.change,
+          changePercent: stock.changesPercentage,
+        }));
+
+      return NextResponse.json(formattedStocks);
+
+    } else {
+      // --- Default View Logic (when search bar is empty) ---
+      const listType = searchParams.get('listType') || 'actives';
+      const listRes = await fetch(`${FMP_API_URL}/stock_market/${listType}?limit=50&apikey=${API_KEY}`);
+      const listData = await listRes.json();
+
+      const formattedStocks = (Array.isArray(listData) ? listData : [])
+        .filter(stock => stock && typeof stock.price === 'number')
+        .map(stock => ({
+          symbol: stock.symbol,
+          name: stock.name,
+          price: stock.price,
+          change: stock.change,
+          changePercent: stock.changesPercentage,
+        }));
+      
+      return NextResponse.json(formattedStocks);
+    }
   } catch (error: any) {
-    console.error("FMP_API_ERROR:", error.message);
-    return new NextResponse('Internal Server Error while fetching from FMP', { status: 500 });
+    console.error("API Error:", error.message);
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
