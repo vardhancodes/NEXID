@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     let stocks: any[] = [];
 
     if (query) {
-      // Use "search-name" for better matching of company names like "apple"
+      // This part handles the powerful COMPANY NAME search when you type.
       const searchRes = await fetch(`${FMP_API_URL}/search-name?query=${query}&limit=20&apikey=${API_KEY}`);
       const searchData = await searchRes.json();
 
@@ -26,12 +26,13 @@ export async function GET(request: Request) {
         stocks = await quoteRes.json();
       }
     } else {
-      // Default view logic remains the same (e.g., fetching actives, gainers)
+      // This part handles the DEFAULT list when the search bar is empty.
+      // You can change "limit=50" to a higher number like "limit=200" if you want.
       const listRes = await fetch(`${FMP_API_URL}/stock_market/${listType}?limit=50&apikey=${API_KEY}`);
       stocks = await listRes.json();
     }
     
-    // **Crucial Fix**: Filter out any items that are missing a price BEFORE sending to the client
+    // This safety filter ensures no bad data crashes your app.
     const formattedStocks = stocks
       .filter(stock => stock && typeof stock.price === 'number' && stock.symbol)
       .map(stock => ({
@@ -39,7 +40,7 @@ export async function GET(request: Request) {
         name: stock.name,
         price: stock.price,
         change: stock.change,
-        changePercent: stock.changesPercentage, // Renaming for consistency with StockCard
+        changePercent: stock.changesPercentage,
       }));
 
     return NextResponse.json(formattedStocks);
