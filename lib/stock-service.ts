@@ -4,42 +4,36 @@ const API_KEY = process.env.FMP_API_KEY;
 type StockListItem = {
   symbol: string;
   name: string;
+  exchangeShortName?: string; // Keep this for sorting
 };
 
-let cachedStockList: StockListItem[] = [];
-let lastFetchTime: number = 0;
-
-// This function fetches a list of all stocks and caches it for 24 hours.
+// This function fetches a list of all stocks and relies on Next.js's fetch cache.
 export async function getStockIndex(): Promise<StockListItem[]> {
-  const now = Date.now();
-  const oneDay = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-
-  // Use the cached list if it's less than a day old.
-  if (cachedStockList.length > 0 && (now - lastFetchTime) < oneDay) {
-    return cachedStockList;
-  }
-
+  const url = `${FMP_API_URL}/stock/list?apikey=${API_KEY}`;
+  
   try {
-    const url = `${FMP_API_URL}/stock/list?apikey=${API_KEY}`;
-    const response = await fetch(url, {
-      // This Next.js feature caches the data on the server.
-      next: { revalidate: 86400 }, // Revalidate once every 24 hours
-    });
+    // This fetch request is automatically cached by Next.js/Vercel.
+    const response = await fetch(url, { next: { revalidate: 86400 } }); // Cache for 24 hours
 
     if (!response.ok) {
-      throw new Error('Failed to fetch stock index from FMP');
+      // If the fetch fails, throw an error to be caught by the API route.
+      throw new Error(`Failed to fetch stock index from FMP. Status: ${response.status}`);
     }
 
     const data: StockListItem[] = await response.json();
     
-    // Filter for valid entries and cache them
-    cachedStockList = data.filter(stock => stock.symbol && stock.name);
-    lastFetchTime = now;
+    // FMP can return an error object instead of an array. We must check for this.
+    if (!Array.isArray(data)) {
+      console.error("FMP API did not return an array for the stock list:", data);
+      throw new Error('Invalid data format received from the stock list API.');
+    }
 
-    return cachedStockList;
+    // Filter for valid entries that have both a name and a symbol.
+    return data.filter(stock => stock.symbol && stock.name);
+
   } catch (error) {
-    console.error("Error fetching stock index:", error);
-    // Return the old cache if the new fetch fails
-    return cachedStockList; 
+    console.error("Error in getStockIndex:", error);
+    // Re-throw the error so the calling API route knows the fetch failed.
+    throw error;
   }
 }
