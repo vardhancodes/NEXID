@@ -1,0 +1,27 @@
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Local Environment Variables
+.env*.local
+
+# Build output
+.next/
+/out/
+
+# Production build folder
+/build
+
+# Next.js build cache
+.next/cache/
+
+# Optional Editor Directories
+.vscode/
+.idea/
+
+# Optional SASS cache
+.sass-cache/
+
+# macOS files
+.DS_Store
