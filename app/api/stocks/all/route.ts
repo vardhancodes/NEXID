@@ -11,26 +11,27 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('search')?.toLowerCase();
-    const listType = searchParams.get('listType') || 'actives'; 
+    const listType = searchParams.get('listType') || 'actives';
 
     let stocks: any[] = [];
 
     if (query) {
-      // --- THIS IS THE ONLY LINE THAT CHANGED ---
-      // We are now using "search-name" instead of "search-ticker" for better name matching.
+      // Use "search-name" for better matching of company names like "apple"
       const searchRes = await fetch(`${FMP_API_URL}/search-name?query=${query}&limit=20&apikey=${API_KEY}`);
-      
       const searchData = await searchRes.json();
+
       if (searchData && searchData.length > 0) {
         const symbols = searchData.map((stock: any) => stock.symbol).join(',');
         const quoteRes = await fetch(`${FMP_API_URL}/quote/${symbols}?apikey=${API_KEY}`);
         stocks = await quoteRes.json();
       }
     } else {
+      // Default view logic remains the same (e.g., fetching actives, gainers)
       const listRes = await fetch(`${FMP_API_URL}/stock_market/${listType}?limit=50&apikey=${API_KEY}`);
       stocks = await listRes.json();
     }
     
+    // **Crucial Fix**: Filter out any items that are missing a price BEFORE sending to the client
     const formattedStocks = stocks
       .filter(stock => stock && typeof stock.price === 'number' && stock.symbol)
       .map(stock => ({
@@ -38,7 +39,7 @@ export async function GET(request: Request) {
         name: stock.name,
         price: stock.price,
         change: stock.change,
-        changePercent: stock.changesPercentage,
+        changePercent: stock.changesPercentage, // Renaming for consistency with StockCard
       }));
 
     return NextResponse.json(formattedStocks);
