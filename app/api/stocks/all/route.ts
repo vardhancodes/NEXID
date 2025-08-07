@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStockIndex } from '@/lib/stock-service'; // Import our new function
+import { getStockIndex } from '@/lib/stock-service'; 
 
 const FMP_API_URL = 'https://financialmodelingprep.com/api/v3';
 const API_KEY = process.env.FMP_API_KEY;
@@ -14,23 +14,30 @@ export async function GET(request: Request) {
     const query = searchParams.get('search')?.toLowerCase();
     
     if (query) {
-      // --- Powerful Search Logic ---
+      // --- Smarter Search Logic ---
       const stockIndex = await getStockIndex();
 
-      // Filter the master list in memory based on company name OR symbol
-      const searchResults = stockIndex
-        .filter(stock => 
-          stock.name.toLowerCase().includes(query) || 
-          stock.symbol.toLowerCase().startsWith(query)
-        )
-        .slice(0, 50); // Get the top 50 matches
+      const filteredResults = stockIndex.filter(stock => 
+        stock.name.toLowerCase().includes(query) || 
+        stock.symbol.toLowerCase().startsWith(query)
+      );
 
-      if (searchResults.length === 0) {
+      // **New Sorting Logic**: Prioritize major exchanges (NASDAQ, NYSE)
+      const exchangePriority: { [key: string]: number } = { 'NASDAQ': 1, 'NYSE': 2 };
+      
+      const sortedResults = filteredResults.sort((a: any, b: any) => {
+        const priorityA = exchangePriority[a.exchangeShortName] || 99;
+        const priorityB = exchangePriority[b.exchangeShortName] || 99;
+        return priorityA - priorityB;
+      });
+
+      const topResults = sortedResults.slice(0, 50);
+
+      if (topResults.length === 0) {
         return NextResponse.json([]);
       }
 
-      // Fetch live quotes for only the top 50 matches
-      const symbols = searchResults.map(stock => stock.symbol).join(',');
+      const symbols = topResults.map(stock => stock.symbol).join(',');
       const quoteRes = await fetch(`${FMP_API_URL}/quote/${symbols}?apikey=${API_KEY}`);
       const quoteData = await quoteRes.json();
       
@@ -47,7 +54,7 @@ export async function GET(request: Request) {
       return NextResponse.json(formattedStocks);
 
     } else {
-      // --- Default View Logic (when search bar is empty) ---
+      // --- Default View Logic (No changes here) ---
       const listType = searchParams.get('listType') || 'actives';
       const listRes = await fetch(`${FMP_API_URL}/stock_market/${listType}?limit=50&apikey=${API_KEY}`);
       const listData = await listRes.json();
