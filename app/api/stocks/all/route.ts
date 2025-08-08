@@ -4,33 +4,37 @@ const FMP_API_URL = 'https://financialmodelingprep.com/api/v3';
 const API_KEY = process.env.FMP_API_KEY;
 
 export async function GET(request: Request) {
-  // 1. Check for the API key
   if (!API_KEY) {
-    console.error("FMP_API_KEY is not set.");
+    console.error("FMP_API_KEY is not set in environment variables.");
     return NextResponse.json({ message: 'API key is missing' }, { status: 500 });
   }
 
   try {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('search')?.trim().toLowerCase();
+    
+    let stocks: any[] = [];
+    let fetchUrl = '';
 
-    // 2. If there's no search query, return an empty list.
-    if (!query) {
-      return NextResponse.json([]);
+    if (query) {
+      // Use the powerful '/search' endpoint for company name AND symbol matching
+      fetchUrl = `${FMP_API_URL}/search?query=${query}&limit=40&exchange=NASDAQ,NYSE,AMEX&apikey=${API_KEY}`;
+    } else {
+      // Fetch curated lists when the search bar is empty
+      const listType = searchParams.get('listType') || 'actives';
+      fetchUrl = `${FMP_API_URL}/stock_market/${listType}?limit=40&apikey=${API_KEY}`;
     }
-
-    // 3. Use the single, reliable search endpoint to get data.
-    const searchUrl = `${FMP_API_URL}/search?query=${query}&limit=50&exchange=NASDAQ,NYSE&apikey=${API_KEY}`;
-    const response = await fetch(searchUrl);
+    
+    const response = await fetch(fetchUrl);
 
     if (!response.ok) {
-      console.error(`FMP API Error: Status ${response.status}`);
-      return NextResponse.json({ message: 'Failed to fetch data from FMP.' }, { status: response.status });
+      const errorBody = await response.text();
+      console.error(`FMP API Error: Status ${response.status}`, errorBody);
+      throw new Error(`Failed to fetch data from FMP API. Status: ${response.status}`);
     }
 
-    const stocks = await response.json();
+    stocks = await response.json();
 
-    // 4. Clean up the data and send it back.
     const formattedStocks = (Array.isArray(stocks) ? stocks : [])
       .filter(stock => stock && typeof stock.price === 'number' && stock.symbol)
       .map(stock => ({
