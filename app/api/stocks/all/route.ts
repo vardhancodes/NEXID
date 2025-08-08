@@ -4,41 +4,33 @@ const FMP_API_URL = 'https://financialmodelingprep.com/api/v3';
 const API_KEY = process.env.FMP_API_KEY;
 
 export async function GET(request: Request) {
+  // 1. Check for the API key
   if (!API_KEY) {
-    console.error("FMP_API_KEY is not set in environment variables.");
+    console.error("FMP_API_KEY is not set.");
     return NextResponse.json({ message: 'API key is missing' }, { status: 500 });
   }
 
   try {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('search')?.trim().toLowerCase();
-    
-    let stocks: any[] = [];
 
-    if (query) {
-      // --- Direct, Powerful Search Logic ---
-      // This single API call searches by name AND symbol and includes price data.
-      // It's limited to 50 results and major exchanges for relevance.
-      const searchUrl = `${FMP_API_URL}/search?query=${query}&limit=50&exchange=NASDAQ,NYSE&apikey=${API_KEY}`;
-      const searchRes = await fetch(searchUrl);
-
-      if (!searchRes.ok) {
-        throw new Error(`Search API failed. Status: ${searchRes.status}`);
-      }
-      stocks = await searchRes.json();
-
-    } else {
-      // --- Default View Logic (when search bar is empty) ---
-      const listType = searchParams.get('listType') || 'actives';
-      const listUrl = `${FMP_API_URL}/stock_market/${listType}?limit=50&apikey=${API_KEY}`;
-      const listRes = await fetch(listUrl);
-      if (!listRes.ok) {
-        throw new Error(`List API failed. Status: ${listRes.status}`);
-      }
-      stocks = await listRes.json();
+    // 2. If there's no search query, return an empty list.
+    if (!query) {
+      return NextResponse.json([]);
     }
-    
-    // Safety filter to remove incomplete data and format the response
+
+    // 3. Use the single, reliable search endpoint to get data.
+    const searchUrl = `${FMP_API_URL}/search?query=${query}&limit=50&exchange=NASDAQ,NYSE&apikey=${API_KEY}`;
+    const response = await fetch(searchUrl);
+
+    if (!response.ok) {
+      console.error(`FMP API Error: Status ${response.status}`);
+      return NextResponse.json({ message: 'Failed to fetch data from FMP.' }, { status: response.status });
+    }
+
+    const stocks = await response.json();
+
+    // 4. Clean up the data and send it back.
     const formattedStocks = (Array.isArray(stocks) ? stocks : [])
       .filter(stock => stock && typeof stock.price === 'number' && stock.symbol)
       .map(stock => ({
@@ -52,7 +44,7 @@ export async function GET(request: Request) {
     return NextResponse.json(formattedStocks);
 
   } catch (error: any) {
-    console.error("API Route Error:", error.message);
+    console.error("API Route Catch Error:", error.message);
     return NextResponse.json({ message: 'An error occurred on the server.' }, { status: 500 });
   }
 }
