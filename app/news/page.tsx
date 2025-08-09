@@ -10,6 +10,7 @@ type Article = {
   description: string;
   imageUrl: string;
   publishedTime: string;
+  site: string;
 };
 
 export default function NewsPage() {
@@ -26,12 +27,7 @@ export default function NewsPage() {
         const response = await fetch('/api/news');
         if (!response.ok) throw new Error('Failed to load news feed. Please try again later.');
         const data = await response.json();
-        
-        if (Array.isArray(data)) {
-            // Sort articles by date, newest first
-            data.sort((a: Article, b: Article) => new Date(b.publishedTime).getTime() - new Date(a.publishedTime).getTime());
-        }
-        setArticles(data);
+        setArticles(Array.isArray(data) ? data : []);
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -75,7 +71,10 @@ export default function NewsPage() {
               <div className="flex-1">
                 <h3 className="text-lg font-bold text-white">{article.title}</h3>
                 <p className="text-sm text-gray-400 mt-1 line-clamp-2">{article.description}</p>
-                <p className="text-xs text-gray-500 mt-2">{new Date(article.publishedTime).toLocaleString()}</p>
+                 <div className="flex justify-between items-center mt-2">
+                    <p className="text-xs text-gray-500">{article.site}</p>
+                    <p className="text-xs text-gray-500">{new Date(article.publishedTime).toLocaleString()}</p>
+                 </div>
               </div>
             </div>
           </a>
@@ -83,7 +82,7 @@ export default function NewsPage() {
          {!isLoading && !error && articles.length === 0 && (
           <div className="text-center py-20">
              <h3 className="text-xl font-semibold text-white">Could Not Load News</h3>
-             <p className="text-gray-400 mt-2">There may be a temporary issue with the news source or the cache is empty.</p>
+             <p className="text-gray-400 mt-2">There may be a temporary issue with the news API.</p>
            </div>
         )}
       </div>
