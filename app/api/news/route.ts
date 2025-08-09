@@ -4,7 +4,7 @@ import { parseStringPromise } from 'xml2js';
 import * as cheerio from 'cheerio';
 
 const NEWS_CACHE_KEY = 'live_scraped_news';
-// Using Reuters as an example news source. You can change this URL.
+// Using Reuters as an example news source. You can change this URL
 const SITEMAP_URL = 'https://www.reuters.com/sitemap_news_us_business.xml';
 const CACHE_TTL_SECONDS = 600; // Cache for 10 minutes
 
