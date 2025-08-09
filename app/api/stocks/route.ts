@@ -1,40 +1,51 @@
-// app/api/stocks/route.ts
 import { NextResponse } from 'next/server';
 
-export async function GET() {
-  // A list of popular stocks we want to display
-  const symbols = 'AAPL,GOOGL,TSLA,AMZN,MSFT,NVDA,META,JPM';
-  const apiKey = process.env.FMP_API_KEY;
+const FMP_API_URL = 'https://financialmodelingprep.com/api/v3';
+const API_KEY = process.env.FMP_API_KEY;
 
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: 'FMP API key is not configured' },
-      { status: 500 }
-    );
+export async function GET(request: Request) {
+  if (!API_KEY) {
+    return new NextResponse('API key is missing', { status: 500 });
   }
 
-  const url = `https://financialmodelingprep.com/api/v3/quote/${symbols}?apikey=${apiKey}`;
-
   try {
-    const response = await fetch(url, {
-        // This Next.js feature caches the data and re-fetches it at most once every 60 seconds.
-        next: {
-            revalidate: 60 
-        }
-    });
+    const { searchParams } = new URL(request.url);
+    const query = searchParams.get('search')?.toLowerCase();
+    // New: Get the list type, defaulting to 'actives'
+    const listType = searchParams.get('listType') || 'actives'; 
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch stock data: ${response.statusText}`);
+    let stocks: any[] = [];
+
+    if (query) {
+      // Search logic remains the same
+      const searchRes = await fetch(`${FMP_API_URL}/search-ticker?query=${query}&limit=20&apikey=${API_KEY}`);
+      const searchData = await searchRes.json();
+      if (searchData && searchData.length > 0) {
+        const symbols = searchData.map((stock: any) => stock.symbol).join(',');
+        const quoteRes = await fetch(`${FMP_API_URL}/quote/${symbols}?apikey=${API_KEY}`);
+        stocks = await quoteRes.json();
+      }
+    } else {
+      // Default view logic now fetches based on listType
+      const listRes = await fetch(`${FMP_API_URL}/stock_market/${listType}?limit=50&apikey=${API_KEY}`);
+      stocks = await listRes.json();
     }
+    
+    // Filter and format the data before sending
+    const formattedStocks = stocks
+      .filter(stock => stock && typeof stock.price === 'number' && stock.symbol)
+      .map(stock => ({
+        symbol: stock.symbol,
+        name: stock.name,
+        price: stock.price,
+        change: stock.change,
+        changePercent: stock.changesPercentage,
+      }));
 
-    const data = await response.json();
-    return NextResponse.json(data);
+    return NextResponse.json(formattedStocks);
 
-  } catch (error) {
-    console.error('FMP API Error:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch stock data from FMP API.' },
-      { status: 500 }
-    );
+  } catch (error: any) {
+    console.error("FMP_API_ERROR:", error.message);
+    return new NextResponse('Internal Server Error while fetching from FMP', { status: 500 });
   }
 }
