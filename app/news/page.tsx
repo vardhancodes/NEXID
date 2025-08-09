@@ -1,63 +1,59 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { Search } from 'lucide-react';
-import StockCard, { StockCardProps } from "@/components/StockCard";
-import StockDetailModal from "@/components/StockDetailModal";
 
-type ListType = 'actives' | 'gainers' | 'losers';
+type Article = {
+  url: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  publishedTime: string;
+};
 
-export default function AllStocksPage() {
+export default function NewsPage() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [listType, setListType] = useState<ListType>('actives');
-  const [stocks, setStocks] = useState<StockCardProps[]>([]);
+  const [articles, setArticles] = useState<Article[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedStock, setSelectedStock] = useState<StockCardProps | null>(null);
-
-  const searchTimeout = useRef<NodeJS.Timeout | null>(null);
-
-  const fetchStocks = useCallback(async (currentSearchTerm: string, currentListType: ListType) => {
-    setIsLoading(true);
-    setError(null);
-    
-    const url = currentSearchTerm
-      ? `/api/stocks/all?search=${currentSearchTerm}`
-      : `/api/stocks/all?listType=${currentListType}`;
-
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error('Could not fetch stock data. Please try again later.');
-      }
-      const data = await response.json();
-      setStocks(data);
-    } catch (err: any) {
-      setError(err.message);
-      setStocks([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    
-    searchTimeout.current = setTimeout(() => {
-      fetchStocks(searchTerm, listType);
-    }, 300); // 300ms debounce
-
-    return () => {
-      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    const fetchNews = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await fetch('/api/news');
+        if (!response.ok) throw new Error('Failed to load news feed. Please try again later.');
+        const data = await response.json();
+        
+        if (Array.isArray(data)) {
+            // Sort articles by date, newest first
+            data.sort((a: Article, b: Article) => new Date(b.publishedTime).getTime() - new Date(a.publishedTime).getTime());
+        }
+        setArticles(data);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
     };
-  }, [searchTerm, listType, fetchStocks]);
+    fetchNews();
+  }, []); // Runs once when the page loads
+
+  const filteredArticles = useMemo(() => {
+    if (!searchTerm.trim()) return articles;
+    return articles.filter(article =>
+      article.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      article.description.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [searchTerm, articles]);
 
   return (
     <motion.div>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white mb-2">Market Movers</h1>
-        <p className="text-gray-400">Explore market trends or search for any stock.</p>
+        <h1 className="text-3xl font-bold text-white mb-2">Financial News</h1>
+        <p className="text-gray-400">The latest market-moving headlines.</p>
       </div>
       <div className="relative mb-8">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -65,44 +61,32 @@ export default function AllStocksPage() {
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search all stocks (e.g., Microsoft, MSFT)..."
+          placeholder="Search news articles..."
           className="w-full pl-12 pr-4 py-3 rounded-lg border-2 border-border-color bg-hover-bg text-white focus:outline-none focus:ring-2 focus:ring-primary transition-colors"
         />
       </div>
-      {!searchTerm && (
-        <div className="flex space-x-2 mb-8">
-          <TabButton name="Most Active" list="actives" activeList={listType} setList={setListType} />
-          <TabButton name="Top Gainers" list="gainers" activeList={listType} setList={setListType} />
-          <TabButton name="Top Losers" list="losers" activeList={listType} setList={setListType} />
-        </div>
-      )}
       <div>
-        {isLoading && <p className="text-center text-gray-400 mt-10">Loading...</p>}
+        {isLoading && <p className="text-center text-gray-400 mt-10">Loading Latest News...</p>}
         {error && <p className="text-center text-red-500 mt-10">{error}</p>}
-        {!isLoading && !error && stocks.length > 0 && (
-          <motion.div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {stocks.map(stock => (
-              <StockCard key={stock.symbol} {...stock} onClick={() => setSelectedStock(stock)} />
-            ))}
-          </motion.div>
-        )}
-        {!isLoading && !error && stocks.length === 0 && (
-           <div className="text-center py-20">
-             <h3 className="text-xl font-semibold text-white">No Stocks Found</h3>
-             <p className="text-gray-400 mt-2">
-               {searchTerm ? `Try adjusting your search term "${searchTerm}"` : "There is no data for the selected list at this time."}
-             </p>
+        {!isLoading && !error && filteredArticles.map((article, index) => (
+          <a key={index} href={article.url} target="_blank" rel="noopener noreferrer" className="block bg-hover-bg border border-border-color rounded-lg p-4 mb-4 hover:border-primary transition-colors">
+            <div className="flex flex-col md:flex-row gap-4">
+              <img src={article.imageUrl} alt={article.title} className="w-full md:w-48 h-32 object-cover rounded-md" />
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-white">{article.title}</h3>
+                <p className="text-sm text-gray-400 mt-1 line-clamp-2">{article.description}</p>
+                <p className="text-xs text-gray-500 mt-2">{new Date(article.publishedTime).toLocaleString()}</p>
+              </div>
+            </div>
+          </a>
+        ))}
+         {!isLoading && !error && articles.length === 0 && (
+          <div className="text-center py-20">
+             <h3 className="text-xl font-semibold text-white">Could Not Load News</h3>
+             <p className="text-gray-400 mt-2">There may be a temporary issue with the news source or the cache is empty.</p>
            </div>
         )}
       </div>
-      <AnimatePresence>
-        {selectedStock && <StockDetailModal stock={selectedStock} onClose={() => setSelectedStock(null)} />}
-      </AnimatePresence>
     </motion.div>
   );
 }
-
-const TabButton = ({ name, list, activeList, setList }: { name: string; list: ListType; activeList: ListType; setList: (list: ListType) => void; }) => {
-  const isActive = list === activeList;
-  return (<button onClick={() => setList(list)} className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors ${isActive ? 'bg-primary text-white' : 'bg-hover-bg text-gray-300 hover:bg-border-color'}`}>{name}</button>);
-};
