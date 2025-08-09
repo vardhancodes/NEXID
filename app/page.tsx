@@ -1,7 +1,7 @@
 // app/page.tsx
 "use client"; 
 
-import { useState, useEffect } from 'react'; // Import useState and useEffect
+import { useState, useEffect } from 'react'; // Import useState and useEffec
 import { motion, AnimatePresence } from 'framer-motion';
 import StockCard, { StockCardProps } from "@/components/StockCard";
 import StockDetailModal from '@/components/StockDetailModal';
