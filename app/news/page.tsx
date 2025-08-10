@@ -35,7 +35,7 @@ export default function NewsPage() {
       }
     };
     fetchNews();
-  }, []); // Runs once when the page loads
+  }, []); // Runs once when the page load
 
   const filteredArticles = useMemo(() => {
     if (!searchTerm.trim()) return articles;

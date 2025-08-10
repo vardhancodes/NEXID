@@ -20,7 +20,7 @@ export async function GET() {
 
     const data = await response.json();
 
-    // The API response is nested under a "content" key.
+    // The API response is nested under a "content" key
     const articles = data.content || [];
 
     // Format the data to match what our frontend page expects.
