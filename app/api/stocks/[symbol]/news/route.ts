@@ -1,50 +1,37 @@
-// app/api/stocks/[symbol]/news/route.ts
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-type Params = {
-  symbol: string;
-};
+const FMP_API_URL = 'https://financialmodelingprep.com/api/v3';
+const API_KEY = process.env.FMP_API_KEY;
 
-export async function GET(request: Request, context: { params: Params }) {
-  const symbol = context.params.symbol;
-  const apiKey = process.env.FMP_API_KEY;
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { symbol: string } }
+) {
+  // 1. Get the stock symbol from the URL (e.g., "AAPL")
+  const symbol = params.symbol;
 
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: 'FMP API key is not configured' },
-      { status: 500 }
-    );
+  if (!API_KEY) {
+    return NextResponse.json({ message: 'API key is missing' }, { status: 500 });
   }
-  
-  const url = `https://financialmodelingprep.com/api/v3/stock_news?tickers=${symbol}&limit=5&apikey=${apiKey}`;
 
   try {
-    const response = await fetch(url, { 
-      next: { 
-        revalidate: 3600 
-      } 
-    }); 
+    // 2. Fetch the latest 10 news articles for that specific symbol
+    const url = `${FMP_API_URL}/stock_news?tickers=${symbol}&limit=10&apikey=${API_KEY}`;
+    
+    // Cache the result for 1 hour to avoid hitting the API limit too often
+    const response = await fetch(url, { next: { revalidate: 3600 } }); 
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch news data: ${response.statusText}`);
+      throw new Error(`Failed to fetch news for ${symbol}. Status: ${response.status}`);
     }
 
     const data = await response.json();
 
-    // ** THIS IS THE IMPORTANT CHECK **
-    // If the data from FMP is an array, we return it.
-    // Otherwise (if it's an error object), we return an empty array.
-    if (Array.isArray(data)) {
-        return NextResponse.json(data);
-    } else {
-        return NextResponse.json([]);
-    }
+    // 3. Return the news data
+    return NextResponse.json(data);
 
-  } catch (error) {
-    console.error('FMP News API Error:', error);
-    return NextResponse.json(
-        { error: 'Failed to fetch news data.' }, 
-        { status: 500 }
-    );
+  } catch (error: any) {
+    console.error(`Error fetching news for ${symbol}:`, error.message);
+    return NextResponse.json({ message: error.message }, { status: 500 });
   }
 }
