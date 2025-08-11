@@ -3,33 +3,45 @@ import { NextResponse } from 'next/server';
 const FMP_API_URL = 'https://financialmodelingprep.com/api/v3';
 const API_KEY = process.env.FMP_API_KEY;
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!API_KEY) {
-    console.error("FMP_API_KEY is not set.");
     return NextResponse.json({ message: 'API key is missing' }, { status: 500 });
   }
 
   try {
-    // Fetching directly from the FMP general news/articles endpoint.
-    const url = `${FMP_API_URL}/fmp/articles?page=0&size=40&apikey=${API_KEY}`;
-    const response = await fetch(url, { next: { revalidate: 3600 } }); // Cache for 1 hour
+    const { searchParams } = new URL(request.url);
+    const query = searchParams.get('search')?.trim().toUpperCase(); // e.g., 'AAPL'
+    
+    let fetchUrl = '';
+
+    if (query) {
+      // If a search query exists, fetch news for that specific ticker.
+      fetchUrl = `${FMP_API_URL}/stock_news?tickers=${query}&limit=40&apikey=${API_KEY}`;
+    } else {
+      // If no search query, fetch top general market news.
+      fetchUrl = `${FMP_API_URL}/fmp/articles?page=0&size=12&apikey=${API_KEY}`;
+    }
+
+    const response = await fetch(fetchUrl, { next: { revalidate: 1800 } }); // Cache for 30 minutes
 
     if (!response.ok) {
       throw new Error(`Failed to fetch news from FMP API. Status: ${response.status}`);
     }
 
-    const data = await response.json();
+    let articles = await response.json();
+    
+    // The general news is nested in a 'content' key, the stock news is not.
+    if (!query) {
+      articles = articles.content || [];
+    }
 
-    // The API response is nested under a "content" key
-    const articles = data.content || [];
-
-    // Format the data to match what our frontend page expects.
-    const formattedArticles = articles.map((article: any) => ({
-      url: article.link,
+    // Format the data to a consistent structure for our frontend.
+    const formattedArticles = (Array.isArray(articles) ? articles : []).map((article: any) => ({
+      url: article.link || article.url,
       title: article.title,
-      description: article.text,
+      description: article.text || article.description,
       imageUrl: article.image,
-      publishedTime: article.date,
+      publishedTime: article.date || article.publishedDate,
       site: article.site,
     }));
     
