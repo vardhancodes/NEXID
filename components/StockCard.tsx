@@ -1,12 +1,13 @@
+// components/StockCard.tsx
 import React from 'react';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 export type StockCardProps = {
   symbol: string;
-  name?: string;
-  price?: number;
-  change?: number;
-  changePercent?: number;
+  name: string;
+  price: number;
+  change: number;
+  changePercent: number;
 };
 
 type CardComponentProps = StockCardProps & {
@@ -14,23 +15,44 @@ type CardComponentProps = StockCardProps & {
 };
 
 const StockCard = ({ symbol, name, price, change, changePercent, onClick }: CardComponentProps) => {
-  const isPositive = (change || 0) >= 0;
+  // --- SAFETY CHECKS ---
+  // If critical data is missing, don't render the card to prevent crashes.
+  if (!symbol || typeof price !== 'number' || typeof change !== 'number') {
+    return null; 
+  }
+
+  const isPositive = change >= 0;
+
   const changeColorClass = isPositive ? 'text-green-500' : 'text-red-500';
-  const glowClass = isPositive ? 'hover:shadow-[0_0_20px_rgba(34,197,94,0.4)]' : 'hover:shadow-[0_0_20px_rgba(239,68,68,0.4)]';
+  const glowClass = isPositive 
+    ? 'hover:shadow-[0_0_20px_rgba(34,197,94,0.4)]'
+    : 'hover:shadow-[0_0_20px_rgba(239,68,68,0.4)]';
 
   return (
-    <div onClick={onClick} className={`bg-hover-bg p-6 rounded-lg border border-border-color cursor-pointer transition-all duration-300 hover:scale-105 hover:border-primary ${glowClass}`}>
+    <div
+      onClick={onClick}
+      className={`
+        bg-hover-bg p-6 rounded-lg border border-border-color
+        cursor-pointer transition-all duration-300
+        hover:scale-105 hover:border-primary ${glowClass}
+      `}
+    >
       <div className="flex justify-between items-start">
         <div>
           <div className="text-2xl font-bold text-white">{symbol}</div>
-          <div className="text-sm text-gray-400 truncate w-48">{name || 'Name not available'}</div>
+          <div className="text-sm text-gray-400 truncate">{name || 'N/A'}</div>
         </div>
         {isPositive ? <ArrowUpRight className="w-8 h-8 text-green-500" /> : <ArrowDownRight className="w-8 h-8 text-red-500" />}
       </div>
+
       <div className="mt-6">
-        <div className="text-3xl font-semibold text-white">${(price || 0).toFixed(2)}</div>
+        <div className="text-3xl font-semibold text-white">
+          {/* Use optional chaining ?. and provide a fallback value */}
+          ${price?.toFixed(2) || '0.00'}
+        </div>
         <div className={`mt-1 text-lg font-medium ${changeColorClass}`}>
-          {isPositive ? '+' : ''}{(change || 0).toFixed(2)} ({isPositive ? '+' : ''}{(changePercent || 0).toFixed(2)}%)
+          {isPositive ? '+' : ''}{change?.toFixed(2) || '0.00'} 
+          ({isPositive ? '+' : ''}{changePercent?.toFixed(2) || '0.00'}%)
         </div>
       </div>
     </div>

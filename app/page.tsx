@@ -1,12 +1,12 @@
 // app/page.tsx
 "use client"; 
 
-import { useState, useEffect } from 'react'; // Import useState and useEffec
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import StockCard, { StockCardProps } from "@/components/StockCard";
 import StockDetailModal from '@/components/StockDetailModal';
+import SearchController from '@/components/SearchController'; // Import the search component
 
-// Animation variants remain the same
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -23,16 +23,12 @@ const itemVariants = {
 };
 
 export default function DashboardPage() {
-  // State for the modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedStock, setSelectedStock] = useState<StockCardProps | null>(null);
-
-  // New states for API data, loading, and errors
   const [stocks, setStocks] = useState<StockCardProps[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // This hook fetches data when the component loads
   useEffect(() => {
     const fetchStockData = async () => {
       try {
@@ -43,13 +39,12 @@ export default function DashboardPage() {
         }
         const data = await response.json();
         
-        // Transform the API data into the format our StockCard component expects
         const formattedData = data.map((stock: any) => ({
           symbol: stock.symbol,
           name: stock.name,
           price: stock.price,
           change: stock.change,
-          changePercent: stock.changesPercentage, // Note the name difference
+          changePercent: stock.changesPercentage,
         }));
 
         setStocks(formattedData);
@@ -63,7 +58,7 @@ export default function DashboardPage() {
     };
 
     fetchStockData();
-  }, []); // The empty array [] means this effect runs only once
+  }, []);
 
   const handleCardClick = (stock: StockCardProps) => {
     setSelectedStock(stock);
@@ -74,25 +69,26 @@ export default function DashboardPage() {
     setIsModalOpen(false);
   };
 
-  // Show a loading message while fetching data
   if (isLoading) {
     return <div className="text-center text-xl text-gray-400 mt-20">Loading Market Data...</div>
   }
 
-  // Show an error message if the fetch fails
   if (error) {
     return <div className="text-center text-xl text-red-500 mt-20">Error: {error}</div>
   }
 
   return (
     <motion.div initial="hidden" animate="visible" variants={containerVariants}>
-      <motion.h1 
-        className="text-3xl font-bold text-white mb-6"
-        variants={itemVariants}
-      >
-        Market Overview
-      </motion.h1>
+      {/* Search Section */}
+      <motion.div variants={itemVariants} className="mb-10">
+        <h1 className="text-3xl font-bold text-white">Market Movers</h1>
+        <p className="text-gray-400 mt-1">Explore market trends or search for any stock.</p>
+        <div className="mt-6">
+          <SearchController />
+        </div>
+      </motion.div>
       
+      {/* Tabs and Stock Cards can go here */}
       <motion.div 
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
         variants={containerVariants}

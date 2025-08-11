@@ -16,11 +16,6 @@ type StockChartProps = {
 };
 
 const StockChart = ({ data }: StockChartProps) => {
-  // Determine if the overall trend is positive or negative to color the line
-  const startPrice = data[0]?.close || 0;
-  const endPrice = data[data.length - 1]?.close || 0;
-  const strokeColor = endPrice >= startPrice ? '#22c55e' : '#ef4444'; // Green or Red
-
   // Format data for the chart
   const formattedData = data.map(item => ({
     date: item.date,
@@ -31,15 +26,15 @@ const StockChart = ({ data }: StockChartProps) => {
     <ResponsiveContainer width="100%" height={250}>
       <LineChart data={formattedData}>
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" />
-        <XAxis 
-          dataKey="date" 
-          tick={{ fill: '#9ca3af' }} 
+        <XAxis
+          dataKey="date"
+          tick={{ fill: '#9ca3af' }}
           tickLine={{ stroke: '#9ca3af' }}
           axisLine={{ stroke: '#9ca3af' }}
         />
-        <YAxis 
+        <YAxis
           domain={['dataMin', 'dataMax']}
-          tick={{ fill: '#9ca3af' }} 
+          tick={{ fill: '#9ca3af' }}
           tickLine={{ stroke: '#9ca3af' }}
           axisLine={{ stroke: '#9ca3af' }}
         />
@@ -50,10 +45,11 @@ const StockChart = ({ data }: StockChartProps) => {
           }}
           labelStyle={{ color: '#d1d5db' }}
         />
-        <Line 
-          type="monotone" 
-          dataKey="price" 
-          stroke={strokeColor}
+        <Line
+          type="monotone"
+          dataKey="price"
+          // Changed the stroke color to white as requested
+          stroke="#FFFFFF"
           strokeWidth={2}
           dot={false}
         />
