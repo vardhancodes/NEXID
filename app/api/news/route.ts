@@ -13,19 +13,22 @@ export async function GET(request: Request) {
     const query = searchParams.get('search')?.trim();
     
     let fetchUrl = '';
+    let isSearch = false;
 
     if (query) {
-      // --- Smart Search Logic (Two Steps) ---
-      // 1. Find the ticker symbol for the user's search term (e.g., "apple" -> "AAPL").
-      const searchResponse = await fetch(`${FMP_API_URL}/search?query=${query}&limit=1&exchange=NASDAQ,NYSE&apikey=${API_KEY}`);
+      isSearch = true;
+      // --- New, More Powerful Search Logic ---
+      // 1. Find up to 5 potential matching companies for the search term.
+      const searchResponse = await fetch(`${FMP_API_URL}/search?query=${query}&limit=5&exchange=NASDAQ,NYSE&apikey=${API_KEY}`);
       const searchData = await searchResponse.json();
 
       if (Array.isArray(searchData) && searchData.length > 0) {
-        const symbol = searchData[0].symbol;
-        // 2. Use the found ticker symbol to fetch stock-specific news.
-        fetchUrl = `${FMP_API_URL}/stock_news?tickers=${symbol}&limit=40&apikey=${API_KEY}`;
+        // 2. Extract all found symbols (e.g., 'MSFT,MU,GOOGL').
+        const symbols = searchData.map((s: any) => s.symbol).join(',');
+        // 3. Fetch a combined news feed for all those symbols.
+        fetchUrl = `${FMP_API_URL}/stock_news?tickers=${symbols}&limit=40&apikey=${API_KEY}`;
       } else {
-        // If no ticker is found, return an empty array.
+        // If no companies match the search, return an empty list immediately.
         return NextResponse.json([]);
       }
     } else {
@@ -40,21 +43,27 @@ export async function GET(request: Request) {
 
     let articles = await response.json();
     
-    // The general news is nested, the stock news is not.
-    if (!query) {
+    // The general news is nested in a 'content' key, the stock news is not.
+    if (!isSearch) {
       articles = articles.content || [];
     }
 
     // Format the data to a consistent structure for our frontend.
-    const formattedArticles = (Array.isArray(articles) ? articles : []).map((article: any) => ({
-      url: article.link || article.url,
-      title: article.title,
-      description: article.text || article.description,
-      imageUrl: article.image,
-      publishedTime: article.date || article.publishedDate,
-      site: article.site,
+    const formattedArticles = (Array.isArray(articles) ? articles : [])
+      .map((article: any) => ({
+        url: article.link || article.url,
+        title: article.title,
+        description: article.text || article.description,
+        imageUrl: article.image,
+        publishedTime: article.date || article.publishedDate,
+        site: article.site,
     }));
     
+    // For search results, sort by date to ensure relevance
+    if (isSearch) {
+        formattedArticles.sort((a, b) => new Date(b.publishedTime).getTime() - new Date(a.publishedTime).getTime());
+    }
+
     return NextResponse.json(formattedArticles);
 
   } catch (error: any) {
