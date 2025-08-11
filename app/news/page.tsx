@@ -1,4 +1,4 @@
-"use "client";
+"use client";
 
 import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
@@ -40,7 +40,6 @@ export default function NewsPage() {
     fetchNews();
   }, []);
 
-  // The "contains" search logic you wanted, runs instantly on the client-side
   const filteredArticles = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     if (!query) return allArticles;
@@ -53,8 +52,8 @@ export default function NewsPage() {
   return (
     <motion.div>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white mb-2">Aggregated Financial News</h1>
-        <p className="text-gray-400">The latest headlines from top financial news sources.</p>
+        <h1 className="text-3xl font-bold text-white mb-2">Financial News</h1>
+        <p className="text-gray-400">The latest headlines, updated hourly.</p>
       </div>
       <div className="relative mb-8">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -62,7 +61,7 @@ export default function NewsPage() {
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search all news (e.g., Ambani, RBI, market)..."
+          placeholder="Search all news (e.g., market, RBI)..."
           className="w-full pl-12 pr-4 py-3 rounded-lg border-2 border-border-color bg-hover-bg text-white focus:outline-none focus:ring-2 focus:ring-primary transition-colors"
         />
       </div>
@@ -83,8 +82,8 @@ export default function NewsPage() {
         ))}
          {!isLoading && !error && allArticles.length === 0 && (
           <div className="text-center py-20">
-             <h3 className="text-xl font-semibold text-white">News Feed is Empty</h3>
-             <p className="text-gray-400 mt-2">The background job is scraping articles. Please check back in a few moments.</p>
+             <h3 className="text-xl font-semibold text-white">News Feed is Updating</h3>
+             <p className="text-gray-400 mt-2">The latest articles are being scraped. Please check back in a moment.</p>
            </div>
         )}
       </div>
