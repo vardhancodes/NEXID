@@ -6,7 +6,11 @@
     "build": "next build",
     "start": "next start"
   },
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "dependencies": {
+    "22": "^0.0.0",
     "@google-cloud/bigquery": "^7.9.4",
     "@vercel/kv": "^3.0.0",
     "autoprefixer": "^10.4.14",
