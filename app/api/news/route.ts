@@ -9,51 +9,26 @@ export async function GET(request: Request) {
   }
 
   try {
-    const { searchParams } = new URL(request.url);
-    const query = searchParams.get('search')?.trim();
-    
-    let fetchUrl = '';
-    let isSearch = false;
+    // Switched to the more modern and accessible '/fmp/articles' endpoint
+    const url = `${FMP_API_URL}/fmp/articles?page=0&size=40&apikey=${API_KEY}`;
+    const response = await fetch(url, { next: { revalidate: 3600 } }); // Cache for 1 hour
 
-    if (query) {
-      isSearch = true;
-      // --- Smart Search Logic ---
-      // 1. Find the best matching stock ticker for the search term (e.g., "apple" -> "AAPL").
-      const searchResponse = await fetch(`${FMP_API_URL}/search?query=${query}&limit=1&exchange=NASDAQ,NYSE&apikey=${API_KEY}`);
-      const searchData = await searchResponse.json();
-
-      if (Array.isArray(searchData) && searchData.length > 0) {
-        const symbol = searchData[0].symbol;
-        // 2. Use that ticker to fetch stock-specific news.
-        fetchUrl = `${FMP_API_URL}/stock_news?tickers=${symbol}&limit=40&apikey=${API_KEY}`;
-      } else {
-        return NextResponse.json([]); // Return empty if no matching company is found
-      }
-    } else {
-      // --- Default View Logic ---
-      // If no search, fetch top 12 general financial news articles.
-      fetchUrl = `${FMP_API_URL}/fmp/articles?page=0&size=12&apikey=${API_KEY}`;
-    }
-
-    const response = await fetch(fetchUrl, { next: { revalidate: 3600 } }); // Cache results for 1 hour
     if (!response.ok) {
-      throw new Error(`Failed to fetch news from FMP API. Status: ${response.status}`);
+      const errorData = await response.json();
+      const errorMessage = errorData['Error Message'] || `FMP API failed with status: ${response.status}`;
+      throw new Error(errorMessage);
     }
 
-    let articles = await response.json();
-    
-    // The general news is nested, the stock news is not.
-    if (!isSearch) {
-      articles = articles.content || [];
-    }
+    const data = await response.json();
+    const articles = data.content || [];
 
-    // Format data to a consistent structure for the frontend.
+    // Format the data to match what our frontend page expects
     const formattedArticles = (Array.isArray(articles) ? articles : []).map((article: any) => ({
-      url: article.link || article.url,
+      url: article.link,
       title: article.title,
-      description: article.text || article.description,
+      description: article.text,
       imageUrl: article.image,
-      publishedTime: article.date || article.publishedDate,
+      publishedTime: article.date,
       site: article.site,
     }));
     
@@ -61,6 +36,6 @@ export async function GET(request: Request) {
 
   } catch (error: any) {
     console.error("News API Error:", error.message);
-    return NextResponse.json({ message: "Failed to fetch news articles." }, { status: 500 });
+    return NextResponse.json({ message: error.message }, { status: 500 });
   }
 }

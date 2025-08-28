@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Search } from 'lucide-react';
 
@@ -19,58 +19,59 @@ export default function NewsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const searchTimeout = useRef<NodeJS.Timeout | null>(null);
-
   useEffect(() => {
-    // Show loading spinner immediately when user starts typing
-    if (searchTerm.trim()) {
+    const fetchNews = async () => {
       setIsLoading(true);
-    }
-
-    // Debounce: Wait for 500ms after user stops typing
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    
-    searchTimeout.current = setTimeout(() => {
-      const fetchNews = async () => {
-        // Set loading to true only before the actual fetch
-        setIsLoading(true); 
-        setError(null);
-        try {
-          const response = await fetch(`/api/news?search=${searchTerm.trim()}`);
-          if (!response.ok) throw new Error('Could not fetch news. Please try again later.');
-          const data = await response.json();
-          setArticles(Array.isArray(data) ? data : []);
-        } catch (err: any) {
-          setError(err.message);
-        } finally {
-          setIsLoading(false);
+      setError(null);
+      try {
+        const response = await fetch('/api/news');
+        if (!response.ok) {
+          // New: Tries to read the specific error message from the backend
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to load news feed. Please try again later.');
         }
-      };
-      fetchNews();
-    }, 500);
+        const data = await response.json();
+        setArticles(Array.isArray(data) ? data : []);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchNews();
+  }, []);
 
-  }, [searchTerm]);
+  const filteredArticles = useMemo(() => {
+    if (!searchTerm.trim()) return articles;
+    return articles.filter(article =>
+      article.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      article.description.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [searchTerm, articles]);
 
   return (
     <motion.div>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white mb-2">Financial News</h1>
-        <p className="text-gray-400">Top headlines, or search for news on a specific stock.</p>
+        {/* New: Updated title and description */}
+        <h1 className="text-3xl font-bold text-white mb-2">Cryptocurrency News</h1>
+        <p className="text-gray-400">The latest headlines from the world of crypto.</p>
       </div>
       <div className="relative mb-8">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        {/* New: Updated placeholder text */}
         <input
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search news for a company or ticker (e.g., Apple, TSLA)..."
+          placeholder="Search crypto news articles..."
           className="w-full pl-12 pr-4 py-3 rounded-lg border-2 border-border-color bg-hover-bg text-white focus:outline-none focus:ring-2 focus:ring-primary transition-colors"
         />
       </div>
       <div>
-        {isLoading && <p className="text-center text-gray-400 mt-10">Loading News...</p>}
-        {error && <p className="text-center text-red-500 mt-10">{error}</p>}
-        {!isLoading && !error && articles.map((article, index) => (
+        {isLoading && <p className="text-center text-gray-400 mt-10">Loading Latest News...</p>}
+        {/* The error message displayed here will now be more specific */}
+        {error && <p className="text-center text-red-500 mt-10">Error: {error}</p>}
+        {!isLoading && !error && filteredArticles.map((article, index) => (
           <a key={index} href={article.url} target="_blank" rel="noopener noreferrer" className="block bg-hover-bg border border-border-color rounded-lg p-4 mb-4 hover:border-primary transition-colors">
             <div className="flex flex-col md:flex-row gap-4">
               <img src={article.imageUrl} alt={article.title} className="w-full md:w-48 h-32 object-cover rounded-md" />
@@ -87,12 +88,8 @@ export default function NewsPage() {
         ))}
          {!isLoading && !error && articles.length === 0 && (
           <div className="text-center py-20">
-             <h3 className="text-xl font-semibold text-white">
-               {searchTerm ? `No news found for "${searchTerm}"` : "Top Headlines"}
-             </h3>
-             <p className="text-gray-400 mt-2">
-               {searchTerm ? "Try another search." : "Search for a company to see specific news."}
-             </p>
+             <h3 className="text-xl font-semibold text-white">Could Not Load News</h3>
+             <p className="text-gray-400 mt-2">There may be a temporary issue with the news API.</p>
            </div>
         )}
       </div>

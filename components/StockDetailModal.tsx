@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
-import { StockCardProps } from './StockCard';
+import { StockCardProps } from './CryptoCard';
 import StockChart from './StockChart';
 
 // --- Define data types ---
