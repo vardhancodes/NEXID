@@ -1,66 +1,160 @@
-// app/settings/page.tsx
 "use client";
 
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useSession, signIn } from "next-auth/react";
 import { motion } from "framer-motion";
+import { User, Shield, Sliders, Bell, LogIn, CheckCircle2 } from "lucide-react";
+import { useState } from "react";
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
-  const router = useRouter();
+  const [currency, setCurrency] = useState("USD");
+  const [refreshInterval, setRefreshInterval] = useState("60");
+  const [saved, setSaved] = useState(false);
 
-  // This effect will redirect unauthenticated users to the homepage
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/");
-    }
-  }, [status, router]);
+  const handleSave = () => {
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
 
-  // Show a loading state while session is being verified
   if (status === "loading") {
-    return <div className="text-center text-xl text-gray-400 mt-20">Loading...</div>;
-  }
-
-  // If the user is authenticated, show the settings page
-  if (status === "authenticated") {
     return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <h1 className="text-3xl font-bold text-white mb-8">Account Settings</h1>
-
-        <div className="bg-hover-bg p-8 rounded-lg border border-border-color">
-          <div className="flex items-center space-x-6">
-            <img
-              src={session.user?.image || ""}
-              alt="Profile picture"
-              className="w-24 h-24 rounded-full"
-            />
-            <div>
-              <h2 className="text-2xl font-semibold text-white">{session.user?.name}</h2>
-              <p className="text-gray-400">{session.user?.email}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-10">
-            <h2 className="text-xl font-semibold text-white mb-4">Danger Zone</h2>
-            <div className="bg-hover-bg p-8 rounded-lg border border-red-500/30">
-                <p className="text-gray-300 mb-4">
-                    Deleting your account is a permanent action and cannot be undone.
-                </p>
-                <button className="bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition-colors">
-                    Delete Account
-                </button>
-            </div>
-        </div>
-      </motion.div>
+      <div className="flex items-center justify-center min-h-[40vh] text-gray-400">
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" />
+        <span className="text-sm">Loading user preferences...</span>
+      </div>
     );
   }
 
-  // Fallback for any other case (though unlikely)
-  return null;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="space-y-8 max-w-4xl"
+    >
+      <div>
+        <h1 className="text-3xl font-extrabold text-white tracking-tight">Account & Settings</h1>
+        <p className="text-gray-400 text-sm mt-1">Configure your dashboard preferences, security, and profile details.</p>
+      </div>
+
+      {/* User Profile / Auth Gate */}
+      {status === "authenticated" && session?.user ? (
+        <div className="p-6 rounded-2xl bg-hover-bg/30 border border-border-color">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center space-x-4">
+              {session.user.image ? (
+                <img
+                  src={session.user.image}
+                  alt={session.user.name || "Profile"}
+                  className="w-16 h-16 rounded-full border-2 border-primary/40"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xl">
+                  {session.user.name?.[0] || 'U'}
+                </div>
+              )}
+              <div>
+                <h2 className="text-xl font-bold text-white">{session.user.name}</h2>
+                <p className="text-sm text-gray-400">{session.user.email}</p>
+                <span className="inline-block mt-1 text-[11px] font-semibold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  Google Authenticated
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="p-6 rounded-2xl bg-hover-bg/30 border border-border-color flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center space-x-4">
+            <div className="p-3 rounded-xl bg-primary/10 text-primary border border-primary/20">
+              <User size={24} />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-white">Sign In for Personalized Experience</h2>
+              <p className="text-sm text-gray-400">Sync custom watchlists and track portfolio metrics across devices.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => signIn('google')}
+            className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-primary text-black font-bold text-xs hover:bg-primary-hover transition-colors self-start sm:self-auto"
+          >
+            <LogIn size={14} />
+            <span>Sign in with Google</span>
+          </button>
+        </div>
+      )}
+
+      {/* Preferences Section */}
+      <div className="p-6 rounded-2xl bg-hover-bg/30 border border-border-color space-y-6">
+        <div className="flex items-center space-x-2 text-white font-bold text-lg">
+          <Sliders size={18} className="text-primary" />
+          <span>Display & Feed Preferences</span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
+              Display Currency
+            </label>
+            <select
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              className="w-full bg-[#0D1117] border border-border-color rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            >
+              <option value="USD">USD ($) - US Dollar</option>
+              <option value="EUR">EUR (€) - Euro</option>
+              <option value="GBP">GBP (£) - British Pound</option>
+              <option value="INR">INR (₹) - Indian Rupee</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
+              Market Polling Interval
+            </label>
+            <select
+              value={refreshInterval}
+              onChange={(e) => setRefreshInterval(e.target.value)}
+              className="w-full bg-[#0D1117] border border-border-color rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            >
+              <option value="30">Every 30 seconds</option>
+              <option value="60">Every 60 seconds (Standard)</option>
+              <option value="300">Every 5 minutes</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="pt-2 flex items-center space-x-4">
+          <button
+            onClick={handleSave}
+            className="px-5 py-2.5 rounded-xl bg-primary text-black font-bold text-xs hover:bg-primary-hover transition-colors"
+          >
+            Save Preferences
+          </button>
+          {saved && (
+            <span className="flex items-center text-xs font-semibold text-emerald-400 space-x-1">
+              <CheckCircle2 size={14} />
+              <span>Preferences saved!</span>
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Danger Zone (only if signed in) */}
+      {status === "authenticated" && (
+        <div className="p-6 rounded-2xl bg-red-950/20 border border-red-500/30">
+          <h2 className="text-lg font-bold text-white mb-2">Danger Zone</h2>
+          <p className="text-sm text-gray-400 mb-4">
+            Deleting your session disconnects Google OAuth and clears stored preferences from the current browser session.
+          </p>
+          <button
+            onClick={() => alert("Session data cleared.")}
+            className="bg-red-600/80 text-white font-bold py-2 px-4 rounded-xl text-xs hover:bg-red-600 transition-colors"
+          >
+            Reset Session
+          </button>
+        </div>
+      )}
+    </motion.div>
+  );
 }

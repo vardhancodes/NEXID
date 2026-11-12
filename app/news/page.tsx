@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Search } from 'lucide-react';
+import { Search, ExternalLink, Calendar, Newspaper } from 'lucide-react';
 
 type Article = {
   url: string;
@@ -26,9 +26,7 @@ export default function NewsPage() {
       try {
         const response = await fetch('/api/news');
         if (!response.ok) {
-          // New: Tries to read the specific error message from the backend
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to load news feed. Please try again later.');
+          throw new Error('Failed to load news feed.');
         }
         const data = await response.json();
         setArticles(Array.isArray(data) ? data : []);
@@ -43,54 +41,116 @@ export default function NewsPage() {
 
   const filteredArticles = useMemo(() => {
     if (!searchTerm.trim()) return articles;
-    return articles.filter(article =>
-      article.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      article.description.toLowerCase().includes(searchTerm.toLowerCase())
+    const term = searchTerm.toLowerCase();
+    return articles.filter(
+      article =>
+        (article.title && article.title.toLowerCase().includes(term)) ||
+        (article.description && article.description.toLowerCase().includes(term)) ||
+        (article.site && article.site.toLowerCase().includes(term))
     );
   }, [searchTerm, articles]);
 
   return (
-    <motion.div>
-      <div className="mb-8">
-        {/* New: Updated title and description */}
-        <h1 className="text-3xl font-bold text-white mb-2">Cryptocurrency News</h1>
-        <p className="text-gray-400">The latest headlines from the world of crypto.</p>
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="space-y-6"
+    >
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold text-white tracking-tight">Cryptocurrency News</h1>
+          <p className="text-gray-400 text-sm mt-1">Real-time headlines, regulatory developments, and market intelligence.</p>
+        </div>
       </div>
-      <div className="relative mb-8">
+
+      <div className="relative">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-        {/* New: Updated placeholder text */}
         <input
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search crypto news articles..."
-          className="w-full pl-12 pr-4 py-3 rounded-lg border-2 border-border-color bg-hover-bg text-white focus:outline-none focus:ring-2 focus:ring-primary transition-colors"
+          placeholder="Filter news by keyword, protocol, or publisher..."
+          className="w-full pl-12 pr-4 py-3 rounded-xl border border-border-color bg-hover-bg/40 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/60 transition-all text-sm"
         />
+        {searchTerm && (
+          <button
+            onClick={() => setSearchTerm('')}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-white px-2 py-1 rounded bg-hover-bg"
+          >
+            Clear
+          </button>
+        )}
       </div>
+
       <div>
-        {isLoading && <p className="text-center text-gray-400 mt-10">Loading Latest News...</p>}
-        {/* The error message displayed here will now be more specific */}
-        {error && <p className="text-center text-red-500 mt-10">Error: {error}</p>}
-        {!isLoading && !error && filteredArticles.map((article, index) => (
-          <a key={index} href={article.url} target="_blank" rel="noopener noreferrer" className="block bg-hover-bg border border-border-color rounded-lg p-4 mb-4 hover:border-primary transition-colors">
-            <div className="flex flex-col md:flex-row gap-4">
-              <img src={article.imageUrl} alt={article.title} className="w-full md:w-48 h-32 object-cover rounded-md" />
-              <div className="flex-1">
-                <h3 className="text-lg font-bold text-white">{article.title}</h3>
-                <p className="text-sm text-gray-400 mt-1 line-clamp-2">{article.description}</p>
-                 <div className="flex justify-between items-center mt-2">
-                    <p className="text-xs text-gray-500 uppercase font-semibold">{article.site}</p>
-                    <p className="text-xs text-gray-500">{new Date(article.publishedTime).toLocaleString()}</p>
-                 </div>
-              </div>
-            </div>
-          </a>
-        ))}
-         {!isLoading && !error && articles.length === 0 && (
-          <div className="text-center py-20">
-             <h3 className="text-xl font-semibold text-white">Could Not Load News</h3>
-             <p className="text-gray-400 mt-2">There may be a temporary issue with the news API.</p>
-           </div>
+        {isLoading && (
+          <div className="space-y-4">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="h-28 rounded-xl bg-hover-bg/30 border border-border-color animate-pulse" />
+            ))}
+          </div>
+        )}
+
+        {error && (
+          <div className="p-6 rounded-xl bg-red-950/30 border border-red-500/30 text-center">
+            <p className="text-rose-400 font-semibold text-sm">Error: {error}</p>
+          </div>
+        )}
+
+        {!isLoading && !error && filteredArticles.length > 0 && (
+          <div className="space-y-4">
+            {filteredArticles.map((article, index) => (
+              <a
+                key={index}
+                href={article.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block bg-hover-bg/30 border border-border-color rounded-xl p-5 hover:border-primary/50 transition-all group"
+              >
+                <div className="flex flex-col md:flex-row gap-5 items-start">
+                  {article.imageUrl && (
+                    <img
+                      src={article.imageUrl}
+                      alt={article.title}
+                      className="w-full md:w-56 h-36 object-cover rounded-lg flex-shrink-0 bg-gray-800"
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-primary">
+                        {article.site || 'Crypto Feed'}
+                      </span>
+                      <span className="text-xs text-gray-500 flex items-center space-x-1">
+                        <Calendar size={12} />
+                        <span>{new Date(article.publishedTime).toLocaleDateString()}</span>
+                      </span>
+                    </div>
+
+                    <h3 className="text-base sm:text-lg font-bold text-white group-hover:text-primary transition-colors mt-1.5 line-clamp-2">
+                      {article.title}
+                    </h3>
+                    <p className="text-sm text-gray-400 mt-1.5 line-clamp-2">
+                      {article.description}
+                    </p>
+
+                    <div className="mt-3 flex items-center text-xs text-gray-400 group-hover:text-primary transition-colors">
+                      <span>Read article</span>
+                      <ExternalLink size={12} className="ml-1" />
+                    </div>
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
+
+        {!isLoading && !error && filteredArticles.length === 0 && (
+          <div className="text-center py-20 bg-hover-bg/20 rounded-2xl border border-border-color">
+            <Newspaper className="w-10 h-10 text-gray-600 mx-auto mb-3" />
+            <h3 className="text-lg font-semibold text-white">No News Stories Found</h3>
+            <p className="text-gray-400 text-sm mt-1">Try searching for other digital asset topics.</p>
+          </div>
         )}
       </div>
     </motion.div>
