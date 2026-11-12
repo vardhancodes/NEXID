@@ -17,6 +17,69 @@
 
 </div>
 
+## 🏛️ System & Dataflow Architecture
+
+```text
+                                  CLIENT BROWSERS
+              ┌─────────────────────────────────────────────────────┐
+              │           Next.js 14 Responsive UI (React)          │
+              │   • Market Overview (/ )   • Asset Catalog (/crypto)│
+              │   • News Feed (/news)      • Asset Deep-Dive (/...) │
+              └───────────────┬─────────────────────────┬───────────┘
+                              │                         │
+                  User Clicks │                         │ Search &
+                 Detail Modal │                         │ Live Polling
+                              ▼                         ▼
+              ┌─────────────────────────────────────────────────────┐
+              │               Interactive Modal Layer               │
+              │        • Framer Motion Spring Transition            │
+              │        • 100-Day Dynamic Rolling Recharts           │
+              │        • Key Metrics & In-Depth News Stream         │
+              └───────────────┬─────────────────────────┬───────────┘
+                              │                         │
+                              ▼                         ▼
+┌───────────────────────────────────────────────────────────────────────────┐
+│                     Next.js Edge / Node API Runtimes                      │
+├──────────────────────────────┬─────────────────────────────┬──────────────┤
+│    /api/crypto/route.ts      │   /api/crypto/[symbol]      │  /api/news   │
+│  (Sample Spot Multi-Quotes)  │ (Historical Data & Quotes)  │ (Aggregator) │
+└──────────────┬───────────────┴──────────────┬──────────────┴──────┬───────┘
+               │                              │                     │
+               ▼                              ▼                     ▼
+┌───────────────────────────────────────────────────────────────────────────┐
+│                      Resilient Fallback Data Engine                       │
+│  • Primary Path: Financial Modeling Prep (FMP) External Rest API          │
+│  • Resilient Engine: lib/crypto-data.ts (Zero-Downtime Local Generator)   │
+│  • NextAuth.js Pipeline: Google OAuth Session Ingestion via BigQuery      │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔄 Live Component Execution Lifecycle
+
+```text
+User Action                Next.js Client                   API Route Gateway                 Data Source
+    │                             │                                 │                              │
+    │── View Dashboard ──────────>│                                 │                              │
+    │                             │── GET /api/crypto ─────────────>│                              │
+    │                             │                                 │── Fetch FMP Spot Quotes ────>│
+    │                             │                                 │<── API Response / Fallback ──│
+    │                             │<── JSON Payload (Quotes) ───────│                              │
+    │<── Render Market Cards ─────│                                 │                              │
+    │                             │                                 │                              │
+    │── Click Asset Card ────────>│                                 │                              │
+    │                             │── Parallel Fetch:               │                              │
+    │                             │   ├── /api/crypto/[sym]/quote ─>│── Fetch Metric Quotes ──────>│
+    │                             │   ├── /api/crypto/[sym] ───────>│── Fetch 100D Historical ────>│
+    │                             │   └── /api/crypto/[sym]/news ──>│── Fetch Asset News ─────────>│
+    │                             │<── Aggregated JSON Results ─────│                              │
+    │<── Mount Detail Modal ──────│                                 │                              │
+    │    (Animated Charts & News) │                                 │                              │
+```
+
+---
+
 ## ✨ Key Capabilities & Enhancements
 
 - **⚡ Real-Time Market Overview:** Instant tracking of top global cryptocurrencies (BTC, ETH, SOL, BNB, XRP, DOGE, ADA, AVAX, etc.) with 24h percentage shifts and sample market breadth.
@@ -28,29 +91,6 @@
   - Automatically activates built-in resilient market fallback streams when external API keys or rate-limits are reached, ensuring **zero downtime** in demo/standalone environments.
 - **🔐 Google OAuth & Analytics Integration:** NextAuth.js authentication pipeline with lazy Google BigQuery session event ingestion.
 - **📱 Responsive Minimal UI:** Dark-mode dashboard layout adhering to clean developer aesthetic principles.
-
----
-
-## 🏛️ System Architecture
-
-```text
-┌────────────────────────────────────────────────────────┐
-│             Next.js 14 Client Layer (App Router)       │
-│  (Market Overview · Asset Explorer · Detail Modal)     │
-└───────────┬────────────────────────────────┬───────────┘
-            │                                │
-            ▼                                ▼
-┌───────────────────────┐        ┌───────────────────────┐
-│     NextAuth.js       │        │   Next.js API Routes  │
-│  (Google OAuth Gate)  │        │ (/api/crypto, /news)  │
-└───────────┬───────────┘        └───────────┬───────────┘
-            │                                │
-            ▼                                ▼
-┌───────────────────────┐        ┌───────────────────────┐
-│ Google Cloud BigQuery │        │ FMP API + Local Engine│
-│   (Session Telemetry) │        │ (Realtime / Fallback) │
-└───────────────────────┘        └───────────────────────┘
-```
 
 ---
 
