@@ -1,181 +1,332 @@
 // components/StockDetailModal.tsx
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { X } from 'lucide-react';
-import { StockCardProps } from './CryptoCard';
+import { X, ExternalLink, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import { CryptoCardProps } from './CryptoCard';
 import StockChart from './StockChart';
 
 // --- Define data types ---
-type StockDetailModalProps = {
-  stock: StockCardProps;
+export type StockDetailModalProps = {
+  stock: CryptoCardProps;
   onClose: () => void;
 };
 
-type RatioData = {
-  marketCap: number;
-  pe: number;
-  eps: number;
-  sharesOutstanding: number;
-  priceAvg50: number;
-  priceAvg200: number;
+type MetricData = {
+  marketCap?: number;
+  volume?: number;
+  pe?: number;
+  eps?: number;
+  sharesOutstanding?: number;
+  priceAvg50?: number;
+  priceAvg200?: number;
+  yearHigh?: number;
+  yearLow?: number;
+  price?: number;
+  change?: number;
+  changesPercentage?: number;
 };
 
 type NewsArticle = {
-  image: string;
+  image?: string;
+  imageUrl?: string;
   title: string;
   url: string;
-  site: string;
-  publishedDate: string;
+  site?: string;
+  publishedDate?: string;
+  publishedTime?: string;
 };
 
-type TabName = 'chart' | 'ratios' | 'news';
+type TabName = 'chart' | 'metrics' | 'news';
 
-// --- Animation Variants ---
-const backdropVariants = { visible: { opacity: 1 }, hidden: { opacity: 0 }};
+const backdropVariants = {
+  visible: { opacity: 1 },
+  hidden: { opacity: 0 },
+};
+
 const modalVariants = {
-  hidden: { y: "50px", opacity: 0, scale: 0.95 },
-  visible: { y: "0", opacity: 1, scale: 1, transition: { type: "spring", stiffness: 200, damping: 20 } },
-  exit: { y: "50px", opacity: 0, scale: 0.95, transition: { duration: 0.2 } },
+  hidden: { y: 30, opacity: 0, scale: 0.96 },
+  visible: { y: 0, opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 24 } },
+  exit: { y: 20, opacity: 0, scale: 0.96, transition: { duration: 0.2 } },
 } as const;
 
-
-const StockDetailModal = ({ stock, onClose }: StockDetailModalProps) => {
-  const isPositive = stock.change >= 0;
-  const changeColorClass = isPositive ? 'text-green-500' : 'text-red-500';
+export default function StockDetailModal({ stock, onClose }: StockDetailModalProps) {
+  const isPositive = (stock.change ?? 0) >= 0;
+  const changeColorClass = isPositive ? 'text-emerald-400' : 'text-rose-400';
 
   const [activeTab, setActiveTab] = useState<TabName>('chart');
-
-  // States for all data sources
-  const [chartData, setChartData] = useState([]);
+  const [chartData, setChartData] = useState<any[]>([]);
   const [isLoadingChart, setIsLoadingChart] = useState(true);
-  const [ratiosData, setRatiosData] = useState<RatioData | null>(null);
-  const [isLoadingRatios, setIsLoadingRatios] = useState(true);
+  const [metricData, setMetricData] = useState<MetricData | null>(null);
+  const [isLoadingMetrics, setIsLoadingMetrics] = useState(true);
   const [newsData, setNewsData] = useState<NewsArticle[]>([]);
   const [isLoadingNews, setIsLoadingNews] = useState(true);
 
   useEffect(() => {
     if (!stock.symbol) return;
+
+    // Load Chart
     setIsLoadingChart(true);
-    fetch(`/api/stocks/${stock.symbol}`).then(res => res.json()).then(data => setChartData(data)).finally(() => setIsLoadingChart(false));
-    setIsLoadingRatios(true);
-    fetch(`/api/stocks/${stock.symbol}/quote`).then(res => res.json()).then(data => setRatiosData(data)).finally(() => setIsLoadingRatios(false));
+    fetch(`/api/crypto/${stock.symbol}`)
+      .then(res => (res.ok ? res.json() : []))
+      .then(data => setChartData(Array.isArray(data) ? data : []))
+      .catch(() => setChartData([]))
+      .finally(() => setIsLoadingChart(false));
+
+    // Load Metrics / Quote
+    setIsLoadingMetrics(true);
+    fetch(`/api/crypto/${stock.symbol}/quote`)
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => setMetricData(data))
+      .catch(() => setMetricData(null))
+      .finally(() => setIsLoadingMetrics(false));
+
+    // Load News
     setIsLoadingNews(true);
-    fetch(`/api/stocks/${stock.symbol}/news`)
-      .then(res => res.json())
-      // ** SAFETY CHECK 1: Only set state if the data is an array **
-      .then(data => {
-        if (Array.isArray(data)) {
-          setNewsData(data);
-        } else {
-          // If not an array, set it to an empty array to prevent errors
-          setNewsData([]); 
-        }
-      })
+    fetch(`/api/crypto/${stock.symbol}/news`)
+      .then(res => (res.ok ? res.json() : []))
+      .then(data => setNewsData(Array.isArray(data) ? data : []))
+      .catch(() => setNewsData([]))
       .finally(() => setIsLoadingNews(false));
   }, [stock.symbol]);
+
+  const formatPrice = (p?: number) => {
+    if (typeof p !== 'number') return '0.00';
+    if (p < 0.01) return p.toPrecision(4);
+    return p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
 
   const renderTabContent = () => {
     switch (activeTab) {
       case 'chart':
-        return isLoadingChart ? <p className="text-gray-500">Loading chart...</p> : <StockChart data={chartData} />;
-      case 'ratios':
-        return isLoadingRatios ? <p className="text-gray-500">Loading ratios...</p> : <KeyRatios data={ratiosData} />;
+        return isLoadingChart ? (
+          <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+            <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" />
+            Loading price chart...
+          </div>
+        ) : (
+          <div className="w-full h-full pt-2">
+            <StockChart data={chartData} />
+          </div>
+        );
+      case 'metrics':
+        return isLoadingMetrics ? (
+          <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+            <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" />
+            Loading metrics...
+          </div>
+        ) : (
+          <CryptoMetrics data={metricData} currentPrice={stock.price} />
+        );
       case 'news':
-        return isLoadingNews ? <p className="text-gray-500">Loading news...</p> : <NewsList articles={newsData} />;
+        return isLoadingNews ? (
+          <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+            <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" />
+            Loading news...
+          </div>
+        ) : (
+          <NewsList articles={newsData} />
+        );
       default:
         return null;
     }
   };
 
   return (
-    <motion.div onClick={onClose} className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm" variants={backdropVariants} initial="hidden" animate="visible" exit="hidden">
-      <motion.div onClick={(e) => e.stopPropagation()} className="relative bg-background border border-border-color rounded-xl shadow-lg w-full max-w-2xl m-4 flex flex-col" variants={modalVariants} initial="hidden" animate="visible" exit="exit">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors z-10"><X size={24} /></button>
-        <div className="p-6 border-b border-border-color">
-          <h2 className="text-2xl font-bold text-white">{stock.symbol}</h2>
-          <p className="text-gray-400">{stock.name}</p>
-          <div className="mt-4">
-            <span className="text-4xl font-bold text-white">${stock.price.toFixed(2)}</span>
-            <span className={`ml-4 text-xl font-medium ${changeColorClass}`}>{isPositive ? '+' : ''}{stock.change.toFixed(2)} ({isPositive ? '+' : ''}{stock.changePercent.toFixed(2)}%)</span>
+    <motion.div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto"
+      variants={backdropVariants}
+      initial="hidden"
+      animate="visible"
+      exit="hidden"
+    >
+      <motion.div
+        onClick={(e) => e.stopPropagation()}
+        className="relative bg-[#0D1117] border border-border-color rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden"
+        variants={modalVariants}
+        initial="hidden"
+        animate="visible"
+        exit="exit"
+      >
+        <button
+          onClick={onClose}
+          aria-label="Close modal"
+          className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors p-2 rounded-lg hover:bg-hover-bg z-10"
+        >
+          <X size={20} />
+        </button>
+
+        {/* Modal Header */}
+        <div className="p-6 border-b border-border-color bg-hover-bg/30">
+          <div className="flex items-start justify-between pr-10">
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-semibold px-2 py-0.5 rounded bg-primary/20 text-primary border border-primary/30">
+                  CRYPTO
+                </span>
+                <h2 className="text-2xl font-bold text-white">{stock.symbol}</h2>
+              </div>
+              <p className="text-gray-400 text-sm mt-0.5">{stock.name || stock.symbol}</p>
+            </div>
+            <Link
+              href={`/crypto/${stock.symbol}`}
+              className="flex items-center space-x-1 text-xs text-primary hover:text-primary-hover transition-colors font-medium px-3 py-1.5 rounded-lg border border-primary/30 hover:bg-primary/10"
+            >
+              <span>Full View</span>
+              <ExternalLink size={13} />
+            </Link>
+          </div>
+
+          <div className="mt-4 flex items-baseline space-x-3">
+            <span className="text-3xl font-extrabold text-white">
+              ${formatPrice(stock.price)}
+            </span>
+            <span className={`flex items-center text-sm font-semibold ${changeColorClass}`}>
+              {isPositive ? <TrendingUp size={16} className="mr-1" /> : <TrendingDown size={16} className="mr-1" />}
+              {isPositive ? '+' : ''}{(stock.change ?? 0).toFixed(2)} ({isPositive ? '+' : ''}{(stock.changePercent ?? 0).toFixed(2)}%)
+            </span>
           </div>
         </div>
-        
-        <div className="flex border-b border-border-color">
-          <TabButton name="chart" activeTab={activeTab} setActiveTab={setActiveTab}>Chart</TabButton>
-          <TabButton name="ratios" activeTab={activeTab} setActiveTab={setActiveTab}>Key Ratios</TabButton>
-          <TabButton name="news" activeTab={activeTab} setActiveTab={setActiveTab}>News</TabButton>
+
+        {/* Navigation Tabs */}
+        <div className="flex border-b border-border-color px-6 bg-[#0D1117]">
+          <TabButton name="chart" activeTab={activeTab} setActiveTab={setActiveTab}>
+            Price Trend
+          </TabButton>
+          <TabButton name="metrics" activeTab={activeTab} setActiveTab={setActiveTab}>
+            Key Metrics
+          </TabButton>
+          <TabButton name="news" activeTab={activeTab} setActiveTab={setActiveTab}>
+            Recent News
+          </TabButton>
         </div>
 
-        <div className="p-6 h-72 flex items-center justify-center overflow-y-auto">{renderTabContent()}</div>
+        {/* Tab Body */}
+        <div className="p-6 h-80 flex items-center justify-center overflow-y-auto">
+          {renderTabContent()}
+        </div>
       </motion.div>
     </motion.div>
   );
-};
+}
 
-// --- Helper Components ---
-
-const TabButton = ({ name, activeTab, setActiveTab, children }: { name: TabName; activeTab: TabName; setActiveTab: (name: TabName) => void; children: React.ReactNode; }) => {
+const TabButton = ({
+  name,
+  activeTab,
+  setActiveTab,
+  children,
+}: {
+  name: TabName;
+  activeTab: TabName;
+  setActiveTab: (name: TabName) => void;
+  children: React.ReactNode;
+}) => {
   const isActive = activeTab === name;
   return (
-    <button onClick={() => setActiveTab(name)} className={`py-3 px-6 font-medium text-sm transition-colors ${isActive ? 'text-white border-b-2 border-primary' : 'text-gray-400 hover:text-white'}`}>
+    <button
+      onClick={() => setActiveTab(name)}
+      className={`py-3 px-4 font-medium text-xs tracking-wide uppercase transition-colors relative ${
+        isActive ? 'text-primary font-bold' : 'text-gray-400 hover:text-white'
+      }`}
+    >
       {children}
+      {isActive && (
+        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t" />
+      )}
     </button>
   );
 };
 
-const KeyRatios = ({ data }: { data: RatioData | null }) => {
-  if (!data) return <p className="text-red-500">Could not load ratio data.</p>;
+const CryptoMetrics = ({ data, currentPrice }: { data: MetricData | null; currentPrice?: number }) => {
+  if (!data) {
+    return <p className="text-gray-400 text-sm">Key metrics unavailable for this asset.</p>;
+  }
 
-  const formatNumber = (num: number) => {
-    if (!num) return 'N/A';
-    if (num > 1_000_000_000_000) return `${(num / 1_000_000_000_000).toFixed(2)}T`;
-    if (num > 1_000_000_000) return `${(num / 1_000_000_000).toFixed(2)}B`;
-    if (num > 1_000_000) return `${(num / 1_000_000).toFixed(2)}M`;
-    return num.toFixed(2);
+  const formatLarge = (num?: number) => {
+    if (typeof num !== 'number' || isNaN(num) || num === 0) return 'N/A';
+    if (num >= 1_000_000_000_000) return `$${(num / 1_000_000_000_000).toFixed(2)}T`;
+    if (num >= 1_000_000_000) return `$${(num / 1_000_000_000).toFixed(2)}B`;
+    if (num >= 1_000_000) return `$${(num / 1_000_000).toFixed(2)}M`;
+    return `$${num.toLocaleString()}`;
   };
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4 w-full text-sm">
-      <RatioItem label="Market Cap" value={formatNumber(data.marketCap)} />
-      <RatioItem label="P/E Ratio" value={data.pe?.toFixed(2)} />
-      <RatioItem label="EPS" value={data.eps?.toFixed(2)} />
-      <RatioItem label="Shares Outstanding" value={formatNumber(data.sharesOutstanding)} />
-      <RatioItem label="50-Day Avg" value={`$${data.priceAvg50?.toFixed(2)}`} />
-      <RatioItem label="200-Day Avg" value={`$${data.priceAvg200?.toFixed(2)}`} />
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 w-full">
+      <div className="bg-hover-bg/50 p-3 rounded-lg border border-border-color">
+        <p className="text-xs text-gray-400">Market Cap</p>
+        <p className="text-white font-semibold text-base mt-1">{formatLarge(data.marketCap)}</p>
+      </div>
+      <div className="bg-hover-bg/50 p-3 rounded-lg border border-border-color">
+        <p className="text-xs text-gray-400">24h Volume</p>
+        <p className="text-white font-semibold text-base mt-1">{formatLarge(data.volume)}</p>
+      </div>
+      <div className="bg-hover-bg/50 p-3 rounded-lg border border-border-color">
+        <p className="text-xs text-gray-400">50-Day Avg</p>
+        <p className="text-white font-semibold text-base mt-1">
+          {data.priceAvg50 ? `$${data.priceAvg50.toFixed(2)}` : 'N/A'}
+        </p>
+      </div>
+      <div className="bg-hover-bg/50 p-3 rounded-lg border border-border-color">
+        <p className="text-xs text-gray-400">200-Day Avg</p>
+        <p className="text-white font-semibold text-base mt-1">
+          {data.priceAvg200 ? `$${data.priceAvg200.toFixed(2)}` : 'N/A'}
+        </p>
+      </div>
+      <div className="bg-hover-bg/50 p-3 rounded-lg border border-border-color">
+        <p className="text-xs text-gray-400">52-Week High</p>
+        <p className="text-white font-semibold text-base mt-1">
+          {data.yearHigh ? `$${data.yearHigh.toFixed(2)}` : 'N/A'}
+        </p>
+      </div>
+      <div className="bg-hover-bg/50 p-3 rounded-lg border border-border-color">
+        <p className="text-xs text-gray-400">52-Week Low</p>
+        <p className="text-white font-semibold text-base mt-1">
+          {data.yearLow ? `$${data.yearLow.toFixed(2)}` : 'N/A'}
+        </p>
+      </div>
     </div>
   );
 };
 
-const RatioItem = ({ label, value }: { label: string; value: string | undefined }) => (
-  <div>
-    <p className="text-gray-400">{label}</p>
-    <p className="text-white font-semibold text-base">{value || 'N/A'}</p>
-  </div>
-);
-
 const NewsList = ({ articles }: { articles: NewsArticle[] }) => {
-  // ** SAFETY CHECK 2: Double-check if articles is an array before mapping **
   if (!Array.isArray(articles) || articles.length === 0) {
-    return <p className="text-gray-500">No recent news found for this stock.</p>;
+    return <p className="text-gray-400 text-sm">No recent news found for this asset.</p>;
   }
 
   return (
-    <div className="w-full h-full">
-      <ul className="space-y-4">
-        {articles.map((article, index) => (
-          <li key={index} className="border-b border-border-color pb-4 last:border-b-0 last:pb-0">
-            <a href={article.url} target="_blank" rel="noopener noreferrer" className="flex items-start space-x-4 group">
-              <img src={article.image} alt={article.title} className="w-20 h-20 object-cover rounded-md" />
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-white group-hover:text-primary transition-colors">{article.title}</p>
-                <p className="text-xs text-gray-400 mt-1">{article.site}</p>
-              </div>
-            </a>
-          </li>
-        ))}
+    <div className="w-full h-full overflow-y-auto pr-1">
+      <ul className="space-y-3">
+        {articles.slice(0, 6).map((article, index) => {
+          const img = article.image || article.imageUrl;
+          return (
+            <li key={index} className="border-b border-border-color/60 pb-3 last:border-b-0 last:pb-0">
+              <a
+                href={article.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-start space-x-3 group hover:opacity-90 transition-opacity"
+              >
+                {img && (
+                  <img
+                    src={img}
+                    alt={article.title}
+                    className="w-16 h-16 object-cover rounded-lg flex-shrink-0 bg-gray-800"
+                  />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-white group-hover:text-primary transition-colors line-clamp-2">
+                    {article.title}
+                  </p>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <span className="text-[10px] uppercase font-bold text-gray-400">{article.site || 'Crypto News'}</span>
+                  </div>
+                </div>
+              </a>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
 };
-
-export default StockDetailModal;

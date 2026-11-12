@@ -1,35 +1,39 @@
-import { NextRequest, NextResponse } from 'next/server';
-
-const FMP_API_URL = 'https://financialmodelingprep.com/api/v3';
-const API_KEY = process.env.FMP_API_KEY;
+import { NextResponse } from 'next/server';
+import { FALLBACK_NEWS } from '@/lib/crypto-data';
 
 export async function GET(
-  request: NextRequest,
+  request: Request,
   { params }: { params: { symbol: string } }
 ) {
-  // Get the stock symbol (e.g., "AAPL") from the URL
   const symbol = params.symbol;
+  const apiKey = process.env.FMP_API_KEY;
 
-  if (!API_KEY) {
-    return NextResponse.json({ message: 'API key is missing' }, { status: 500 });
-  }
+  if (apiKey) {
+    try {
+      const url = `https://financialmodelingprep.com/api/v3/stock_news?tickers=${symbol}&limit=10&apikey=${apiKey}`;
+      const response = await fetch(url, { next: { revalidate: 3600 } });
 
-  try {
-    // Fetch the latest 10 news articles for that specific symbol
-    const url = `${FMP_API_URL}/stock_news?tickers=${symbol}&limit=10&apikey=${API_KEY}`;
-    
-    // Cache the result for 1 hour
-    const response = await fetch(url, { next: { revalidate: 3600 } }); 
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch news for ${symbol}. Status: ${response.status}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data) && data.length > 0) {
+          return NextResponse.json(data);
+        }
+      }
+    } catch (error) {
+      console.warn(`FMP news error for ${symbol}, using fallback news:`, error);
     }
-
-    const data = await response.json();
-    return NextResponse.json(data);
-
-  } catch (error: any) {
-    console.error(`Error fetching news for ${symbol}:`, error.message);
-    return NextResponse.json({ message: error.message }, { status: 500 });
   }
+
+  // Format fallback news with image and publishedDate properties
+  const formatted = FALLBACK_NEWS.map(n => ({
+    title: n.title,
+    url: n.url,
+    site: n.site,
+    image: n.imageUrl,
+    imageUrl: n.imageUrl,
+    publishedDate: n.publishedTime,
+    text: n.description,
+  }));
+
+  return NextResponse.json(formatted);
 }

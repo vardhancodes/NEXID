@@ -5,99 +5,64 @@ import * as cheerio from 'cheerio';
 
 const NEWS_CACHE_KEY = 'aggregated_news_articles';
 
-// --- NEWS SOURCES CONFIGURATION ---
-// Add any website you want to scrape here, but you MUST provide a custom scraper for each.
-const sources = [
-  {
-    name: 'Reuters Business',
-    sitemapUrl: 'https://www.reuters.com/sitemap_news_us_business.xml',
-    scraper: scrapeReutersArticle,
-  },
-  // Add another source example. NOTE: This will need custom selectors.
-  // {
-  //   name: 'Moneycontrol',
-  //   sitemapUrl: 'https://www.moneycontrol.com/news_sitemap_index.xml', // Example URL
-  //   scraper: scrapeMoneycontrolArticle,
-  // }
-];
-
-// --- CUSTOM SCRAPER FUNCTIONS ---
-// Each website has a different HTML structure, so each needs its own function.
+export const dynamic = 'force-dynamic';
 
 async function scrapeReutersArticle(url: string) {
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
     if (!response.ok) return null;
     const html = await response.text();
     const $ = cheerio.load(html);
 
-    // Selectors specific to reuters.com
-    const title = $('h1').first().text();
-    const description = $('meta[name="description"]').attr('content');
-    const imageUrl = $('meta[property="og:image"]').attr('content');
-    const publishedTime = $('meta[property="article:published_time"]').attr('content');
+    const title = $('h1').first().text().trim();
+    const description = $('meta[name="description"]').attr('content') || '';
+    const imageUrl = $('meta[property="og:image"]').attr('content') || '';
+    const publishedTime = $('meta[property="article:published_time"]').attr('content') || new Date().toISOString();
 
-    if (title && description && imageUrl) {
-      return { url, title, description, imageUrl, publishedTime };
+    if (title) {
+      return { url, title, description, imageUrl, publishedTime, site: 'Reuters' };
     }
     return null;
-  } catch (error) { return null; }
-}
-
-// Example for another site - this is a template and WILL NOT WORK without correct selectors
-async function scrapeMoneycontrolArticle(url: string) {
-  // ⚠️ YOU MUST CUSTOMIZE THESE SELECTORS FOR EACH NEW WEBSITE
-  // To do this: visit an article on the site, right-click -> "Inspect", and find the correct HTML tags.
-  // This is just a placeholder to show the concept.
-  try {
-    const response = await fetch(url);
-    if (!response.ok) return null;
-    const html = await response.text();
-    const $ = cheerio.load(html);
-
-    const title = $('.article_title_h1').text(); // Example selector
-    const description = $('.article_desc').text(); // Example selector
-    const imageUrl = $('.article_image img').attr('src'); // Example selector
-    const publishedTime = $('.article_pub_date').text(); // Example selector
-
-    if (title && description && imageUrl) {
-      return { url, title, description, imageUrl, publishedTime };
-    }
+  } catch (error) {
     return null;
-  } catch (error) { return null; }
+  }
 }
 
-
-// --- MAIN SCRAPING JOB ---
 export async function GET() {
-  console.log('Starting hourly news scraping job...');
-  let allArticles = [];
+  let allArticles: any[] = [];
 
-  for (const source of sources) {
-    try {
-      console.log(`Fetching sitemap for ${source.name}...`);
-      const sitemapResponse = await fetch(source.sitemapUrl);
+  try {
+    const sitemapUrl = 'https://www.reuters.com/sitemap_news_us_business.xml';
+    const sitemapResponse = await fetch(sitemapUrl, { signal: AbortSignal.timeout(5000) });
+    if (sitemapResponse.ok) {
       const sitemapXml = await sitemapResponse.text();
       const sitemapJson = await parseStringPromise(sitemapXml);
 
-      // Limit to the 20 most recent articles from each source
-      const urls = sitemapJson.urlset.url.slice(0, 20).map((u: any) => u.loc[0]);
-      
-      const scrapingPromises = urls.map(source.scraper);
-      const articles = (await Promise.all(scrapingPromises)).filter(Boolean);
-      allArticles.push(...articles);
-      console.log(`Scraped ${articles.length} articles from ${source.name}.`);
-    } catch (e) {
-      console.error(`Failed to process source ${source.name}`, e);
+      const urls = sitemapJson?.urlset?.url
+        ? sitemapJson.urlset.url.slice(0, 10).map((u: any) => u.loc?.[0]).filter(Boolean)
+        : [];
+
+      if (urls.length > 0) {
+        const scrapingPromises = urls.map(scrapeReutersArticle);
+        const articles = (await Promise.all(scrapingPromises)).filter(Boolean);
+        allArticles.push(...articles);
+      }
+    }
+  } catch (e) {
+    console.warn('Scraping sitemap warning:', e);
+  }
+
+  // Attempt to store in KV if KV credentials exist
+  if (allArticles.length > 0 && process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+    try {
+      await kv.set(NEWS_CACHE_KEY, allArticles);
+    } catch (err) {
+      console.warn('KV caching skipped:', err);
     }
   }
 
-  if (allArticles.length > 0) {
-    await kv.set(NEWS_CACHE_KEY, allArticles);
-    console.log(`Scraping job finished. Total articles saved: ${allArticles.length}`);
-    return NextResponse.json({ status: 'ok', articles_scraped: allArticles.length });
-  } else {
-    console.log('Scraping job finished. No new articles found.');
-    return NextResponse.json({ status: 'no_new_articles', articles_scraped: 0 });
-  }
+  return NextResponse.json({
+    status: allArticles.length > 0 ? 'ok' : 'no_new_articles',
+    articles_scraped: allArticles.length,
+  });
 }
