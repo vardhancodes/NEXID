@@ -1,30 +1,52 @@
 import { NextResponse } from 'next/server';
 import { FALLBACK_NEWS } from '@/lib/crypto-data';
+import { parseStringPromise } from 'xml2js';
 
 export async function GET(
   request: Request,
   { params }: { params: { symbol: string } }
 ) {
-  const symbol = params.symbol;
-  const apiKey = process.env.FMP_API_KEY;
+  const symbol = params.symbol.replace(/USDT|USD/gi, '').toLowerCase();
 
-  if (apiKey) {
+  const feeds = [
+    { url: 'https://cointelegraph.com/rss', site: 'Cointelegraph' },
+    { url: 'https://decrypt.co/feed', site: 'Decrypt' }
+  ];
+
+  for (const feed of feeds) {
     try {
-      const url = `https://financialmodelingprep.com/api/v3/stock_news?tickers=${symbol}&limit=10&apikey=${apiKey}`;
-      const response = await fetch(url, { next: { revalidate: 3600 } });
+      const res = await fetch(feed.url, { next: { revalidate: 600 } });
+      if (res.ok) {
+        const xml = await res.text();
+        const parsed = await parseStringPromise(xml);
+        const items = parsed?.rss?.channel?.[0]?.item || [];
+        if (Array.isArray(items) && items.length > 0) {
+          const matched = items
+            .filter((item: any) => {
+              const text = (item.title?.[0] || '') + ' ' + (item.description?.[0] || '');
+              return text.toLowerCase().includes(symbol);
+            })
+            .slice(0, 10)
+            .map((item: any) => ({
+              title: item.title?.[0] || 'Market Update',
+              url: item.link?.[0] || '#',
+              site: feed.site,
+              image: 'https://images.unsplash.com/photo-1622979135225-d2ba269bc1df?w=800&auto=format&fit=crop&q=60',
+              imageUrl: 'https://images.unsplash.com/photo-1622979135225-d2ba269bc1df?w=800&auto=format&fit=crop&q=60',
+              publishedDate: item.pubDate?.[0] || new Date().toISOString(),
+              text: (item.description?.[0] || '').replace(/<[^>]*>?/gm, '').slice(0, 180),
+            }));
 
-      if (response.ok) {
-        const data = await response.json();
-        if (Array.isArray(data) && data.length > 0) {
-          return NextResponse.json(data);
+          if (matched.length > 0) {
+            return NextResponse.json(matched);
+          }
         }
       }
-    } catch (error) {
-      console.warn(`FMP news error for ${symbol}, using fallback news:`, error);
+    } catch (e) {
+      console.warn(`[News RSS Feed Error for ${symbol}]:`, e);
     }
   }
 
-  // Format fallback news with image and publishedDate properties
   const formatted = FALLBACK_NEWS.map(n => ({
     title: n.title,
     url: n.url,
