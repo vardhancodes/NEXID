@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-[#0b0e14] text-gray-200 antialiased font-sans min-h-screen selection:bg-purple-900 selection:text-white;
+  }
+}
+
+/* Custom react-grid-layout styles */
+.react-grid-layout {
+  position: relative;
+  transition: height 200ms ease;
+}
+.react-grid-item {
+  transition: all 200ms ease;
+  transition-property: left, top;
+}
+.react-grid-item.cssTransforms {
+  transition-property: transform;
+}
+.react-grid-item.resizing {
+  z-index: 100;
+  box-sizing: border-box;
+}
+.react-grid-item.react-draggable-dragging {
+  transition: none;
+  z-index: 100;
+}
+.react-grid-item > .react-resizable-handle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  bottom: 0;
+  right: 0;
+  cursor: se-resize;
+}
+.react-grid-item > .react-resizable-handle::after {
+  content: "";
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 6px;
+  height: 6px;
+  border-right: 2px solid #6b7280;
+  border-bottom: 2px solid #6b7280;
+}
+
+/* Scrollbar customization */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0f141c;
+}
+::-webkit-scrollbar-thumb {
+  background: #242c3d;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3b465e;
+}
