@@ -9,26 +9,43 @@ export async function GET(
   request: Request,
   { params }: { params: Params }
 ) {
-  const symbol = params.symbol;
-  const apiKey = process.env.FMP_API_KEY;
+  let symbol = params.symbol.toUpperCase();
+  if (symbol.endsWith('USD') && !symbol.endsWith('USDT')) {
+    symbol = `${symbol}T`;
+  }
+  if (!symbol.includes('USDT') && !symbol.includes('USD')) {
+    symbol = `${symbol}USDT`;
+  }
 
-  if (apiKey) {
+  // 1. Try Binance Vision / Binance Public Klines (Zero Key)
+  const binanceHosts = ['https://data-api.binance.vision', 'https://api.binance.com'];
+  for (const host of binanceHosts) {
     try {
-      const url = `https://financialmodelingprep.com/api/v3/historical-price-full/${symbol}?timeseries=100&apikey=${apiKey}`;
-      const response = await fetch(url, { next: { revalidate: 3600 } });
-
+      const url = `${host}/api/v3/klines?symbol=${symbol}&interval=1d&limit=100`;
+      const response = await fetch(url, { next: { revalidate: 300 } });
       if (response.ok) {
-        const data = await response.json();
-        if (data && Array.isArray(data.historical) && data.historical.length > 0) {
-          return NextResponse.json(data.historical);
+        const klines = await response.json();
+        if (Array.isArray(klines) && klines.length > 0) {
+          const formatted = klines.map((k: any) => {
+            const date = new Date(k[0]).toISOString().split('T')[0];
+            return {
+              date,
+              open: parseFloat(k[1]),
+              high: parseFloat(k[2]),
+              low: parseFloat(k[3]),
+              close: parseFloat(k[4]),
+              volume: parseFloat(k[5]),
+            };
+          });
+          return NextResponse.json(formatted);
         }
       }
-    } catch (error) {
-      console.warn(`FMP Historical API error for ${symbol}, using generated trend data:`, error);
+    } catch (err) {
+      console.warn(`[Binance Kline Error on ${host}]:`, err);
     }
   }
 
-  // Resilient historical data fallback
-  const historical = getHistoricalData(symbol);
+  // Fallback to local generator
+  const historical = getHistoricalData(params.symbol);
   return NextResponse.json(historical);
 }
